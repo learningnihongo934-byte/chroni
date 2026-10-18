@@ -160,14 +160,22 @@ async function markUsed($: EngineInterface, server: string) {
   })
 }
 
-/** The hidden instructions of muted servers named in `text`, once each per session. */
-function restore(text: string) {
+/**
+ * The hidden instructions of muted servers that `text` names, once each per
+ * session. A server counts as named by one of its tool names, or, in a search
+ * query, by its own name as a word ("blender scene" names Blender).
+ */
+function restore(text: string, query = '') {
   const back: string[] = []
-  for (const [server, body] of hidden)
-    if (!restored.has(server) && text.includes(`mcp__${server}__`)) {
-      restored.add(server)
-      back.push(`[chroni: instructions for the ${server} tools, hidden earlier to save tokens]\n${body.trim()}`)
-    }
+  const words = query.toLowerCase().split(/[^a-z0-9]+/).filter(w => w.length >= 4)
+  for (const [server, body] of hidden) {
+    if (restored.has(server)) continue
+    const name = server.toLowerCase()
+    const isNamed = text.includes(`mcp__${server}__`) || words.some(w => name === w || name.split('_').includes(w))
+    if (!isNamed) continue
+    restored.add(server)
+    back.push(`[chroni: instructions for the ${server} tools, hidden earlier to save tokens]\n${body.trim()}`)
+  }
   return back
 }
 
@@ -347,7 +355,11 @@ export const register: Register = on => {
     const ran = await next(e)
     await loadPolicy($)
     if (ran.deny !== undefined || hidden.size === 0) return ran
-    const back = restore(`${ran.text ?? ''}\n${JSON.stringify(e)}`)
+    // The result may carry tool references rather than text, so look everywhere.
+    let seen = ran.text ?? ''
+    try { seen += JSON.stringify(ran.result) } catch {}
+    const query = String((e as { query?: unknown }).query ?? '')
+    const back = restore(`${seen}\n${query}`, query)
     return back.length ? { ...ran, context: [...(ran.context ?? []), ...back] } : ran
   }).catch(($, e, next) => next(e))
 

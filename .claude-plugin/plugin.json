@@ -1,6 +1,6 @@
 {
   "name": "chroni",
-  "version": "0.2.1",
+  "version": "0.2.2",
   "description": "Use Claude Code longer: trims noisy output, maps big files, hides unused tool servers, keeps replies lean, and nudges you to hand off long chats. Keeps every error.",
   "author": {
     "name": "Virat Kaukuntla"

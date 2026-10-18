@@ -182,7 +182,8 @@ function promptWorld(on: On, used: Record<string, number> = {}) {
   mock.store(on, { mcpUsed: used })
   on('ui.status', () => ({ value: undefined }))
   on('prompt.attachment', () => ({ text: 'mcp__blender__run\nmcp__blender__render\nmcp__ccd_session__start\nWebFetch' }))
-  on('tool.call', { tool: 'ToolSearch' }, () => ({ result: {}, text: 'Loaded: mcp__blender__run' }))
+  // Like the real tool: the result names no tool in plain text.
+  on('tool.call', { tool: 'ToolSearch' }, () => ({ result: { matches: [] }, text: '' }))
   on('prompt.compose', () => ({
     sections: [
       { id: 'intro', text: 'You are Claude.', scope: 'shared' as const },
@@ -231,6 +232,14 @@ test('a hidden server gets its instructions back when Claude searches for it', a
   await $.prompt.compose(COMPOSE)
   const ran = await $.tool.call({ tool: 'ToolSearch', query: 'select:mcp__blender__run', max_results: 1 } as never)
   expect((ran.context ?? []).join('\n')).toContain('Respect the scene graph')
+})
+
+test('a keyword search that names a hidden server brings its instructions back', async ($, on) => {
+  promptWorld(on)
+  await $.prompt.compose(COMPOSE)
+  const ran = await $.tool.call({ tool: 'ToolSearch', query: '+Blender scene info', max_results: 1 } as never)
+  expect((ran.context ?? []).join('\n')).toContain('Respect the scene graph')
+  expect((ran.context ?? []).join('\n')).not.toContain('Generate sprites')
 })
 
 test('hidden instructions survive a reload (they are saved, not just kept in memory)', async ($, on) => {
