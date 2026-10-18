@@ -56,14 +56,15 @@ test('CHRONI=off passes the full output through', async ($, on) => {
   expect((ran.result as { stdout: string }).stdout).toBe(noisy)
 })
 
-test('trims a failing command too', async ($, on) => {
+test('trims a failing command too, as a result Claude Code accepts', async ($, on) => {
   const text = `Exit code 1\n${noisy}`
   world(on, { isError: true, text })
   const ran = await $.tool.call({ tool: 'Bash', command: 'npm test' })
-  expect(ran.isError).toBe(true)
-  const out = String(ran.isError ? (ran.text ?? ran.result) : '')
+  // Core only takes a Bash-shaped record from a hook, never a bare string.
+  const out = (ran.result as { stdout: string }).stdout
+  expect(typeof out).toBe('string')
+  expect(out.startsWith('Exit code 1 (the command failed)')).toBe(true)
   expect(out).toContain('[chroni: trimmed')
-  expect(out).toContain('Exit code 1')
   expect(out).toContain('error TS2322')
   expect(out.length).toBeLessThan(text.length / 4)
 })

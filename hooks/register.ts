@@ -74,15 +74,25 @@ export const register: Register = on => {
     const ran = await next(e)
     if (ran.deny !== undefined || passThrough(e.command) || (await isOff($))) return ran
 
-    // A failing command (non-zero exit) arrives as one error text.
+    // A failing command (non-zero exit) arrives as one error text that starts
+    // with "Exit code N". A hook can't answer with an error of its own, so the
+    // trimmed text goes back as a normal result, the exit code still on top.
     if (ran.isError === true) {
       const raw = ran.text
-      if (typeof raw !== 'string') return ran
+      if (typeof raw !== 'string' || !/^Exit code \d+/.test(raw)) return ran
       const s = squeeze(raw)
       if (!s) return ran
       const path = await saveLog($, raw)
       await record($, s.charsBefore - s.charsAfter)
-      return { isError: true, result: `${note(s.linesBefore, s.linesAfter, path)}\n${s.text}`, context: ran.context }
+      const [first, ...rest] = s.text.split('\n')
+      return {
+        result: {
+          stdout: `${first} (the command failed)\n${note(s.linesBefore, s.linesAfter, path)}\n${rest.join('\n')}`,
+          stderr: '',
+          interrupted: false,
+        },
+        context: ran.context,
+      }
     }
 
     const r = ran.result
