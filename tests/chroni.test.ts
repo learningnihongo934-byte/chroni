@@ -1,0 +1,77 @@
+import { expect, mock, test } from 'claude-code/testing'
+import type { On } from 'claude-code'
+
+// A long, noisy build log with two real errors buried in the middle.
+const noisy = [
+  '> app@1.0.0 build',
+  ...Array.from({ length: 400 }, (_, i) => `Compiling module ${i} of 900 (${i * 3}ms)`),
+  'src/api/user.ts(42,7): error TS2322: Type string is not assignable to type number.',
+  ...Array.from({ length: 400 }, (_, i) => `info  bundling chunk-${i}.js ${i * 11} kB`),
+  'ERROR in src/pages/home.tsx: Module not found: lodash',
+  ...Array.from({ length: 100 }, (_, i) => `asset ${i}.png ${i} kB [emitted]`),
+  'Build failed with 2 errors.',
+].join('\n')
+
+function world(on: On, answer: { stdout?: string; text?: string; isError?: boolean }) {
+  const writes: { path: string; text: string }[] = []
+  mock.store(on)
+  mock.env(on, { HOME: '/home/test' })
+  on('fs.write', ($, e) => {
+    writes.push(e)
+    return { value: undefined }
+  })
+  on('ui.status', () => ({ value: undefined }))
+  on('tool.call', { tool: 'Bash' }, () =>
+    answer.isError
+      ? { isError: true, result: answer.text, text: answer.text }
+      : { result: { stdout: answer.stdout ?? '', stderr: '', interrupted: false } },
+  )
+  return writes
+}
+
+test('trims a noisy log but keeps every error, the start and the end', async ($, on) => {
+  const writes = world(on, { stdout: noisy })
+  const ran = await $.tool.call({ tool: 'Bash', command: 'npm run build' })
+  const out = (ran.result as { stdout: string }).stdout
+
+  expect(out.startsWith('[chroni: trimmed')).toBe(true)
+  expect(out.length).toBeLessThan(noisy.length / 4)
+  expect(out).toContain('error TS2322')
+  expect(out).toContain('Module not found: lodash')
+  expect(out).toContain('> app@1.0.0 build')
+  expect(out).toContain('Build failed with 2 errors.')
+  expect(out).toContain('/home/test/.claude/chroni/logs/output-0.log')
+  expect(writes[0]?.text).toBe(noisy)
+})
+
+test('leaves small output exactly as it was', async ($, on) => {
+  world(on, { stdout: 'On branch main\nnothing to commit, working tree clean' })
+  const ran = await $.tool.call({ tool: 'Bash', command: 'git status' })
+  expect((ran.result as { stdout: string }).stdout).toBe('On branch main\nnothing to commit, working tree clean')
+})
+
+test('CHRONI=off passes the full output through', async ($, on) => {
+  world(on, { stdout: noisy })
+  const ran = await $.tool.call({ tool: 'Bash', command: 'CHRONI=off npm run build' })
+  expect((ran.result as { stdout: string }).stdout).toBe(noisy)
+})
+
+test('trims a failing command too', async ($, on) => {
+  const text = `Exit code 1\n${noisy}`
+  world(on, { isError: true, text })
+  const ran = await $.tool.call({ tool: 'Bash', command: 'npm test' })
+  expect(ran.isError).toBe(true)
+  const out = String(ran.isError ? (ran.text ?? ran.result) : '')
+  expect(out).toContain('[chroni: trimmed')
+  expect(out).toContain('Exit code 1')
+  expect(out).toContain('error TS2322')
+  expect(out.length).toBeLessThan(text.length / 4)
+})
+
+test('never trims commands that read content on purpose', async ($, on) => {
+  world(on, { stdout: noisy })
+  for (const command of ['cat build.log', 'git diff HEAD~3', 'grep -rn TODO src', 'cd app && sed -n 1,900p x.ts', 'git log -n 5 -p']) {
+    const ran = await $.tool.call({ tool: 'Bash', command })
+    expect((ran.result as { stdout: string }).stdout).toBe(noisy)
+  }
+})

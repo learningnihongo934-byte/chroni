@@ -1,0 +1,14 @@
+{
+  "name": "chroni",
+  "description": "Chroni: use far fewer Claude Code tokens without making Claude dumber.",
+  "owner": {
+    "name": "Virat Kaukuntla"
+  },
+  "plugins": [
+    {
+      "name": "chroni",
+      "source": "./",
+      "description": "Cuts Claude Code token use by trimming noisy command output while keeping every error."
+    }
+  ]
+}
