@@ -1,15 +1,46 @@
 import type { EngineInterface, Register } from 'claude-code'
 
+import { isFirstParty, muteInstructions, muteListing, serverOf } from './diet.ts'
+import { outline } from './outline.ts'
 import { fmt, passThrough, squeeze, tokens } from './squeeze.ts'
 
 // Full logs rotate through this many files, so disk use stays bounded.
 const LOG_SLOTS = 200
+// Reads of text files longer than this, with no offset/limit, get the head plus a map.
+const READ_MIN_LINES = 600
+const READ_HEAD_LINES = 250
+// A tool server unused for this long has its instructions and listing hidden.
+const MCP_IDLE_MS = 14 * 24 * 60 * 60 * 1000
+// Context sizes (tokens) at which to suggest /handoff, once each per session.
+const NUDGE_AT = [80_000, 150_000, 300_000]
 
-let sessionSaved = 0
+const FEATURES = {
+  output: 'trims noisy command output',
+  reads: 'maps big files instead of reading them whole',
+  lean: 'asks Claude for shorter replies',
+  tools: 'hides unused tool servers',
+} as const
+type Feature = keyof typeof FEATURES
 
-// Claude often runs several commands at once. Store reads and writes go
-// through this queue so two outputs never claim the same log slot or lose
-// each other's savings.
+const LEAN = `# Keep replies lean (Chroni)
+Every word you write is paid for, and re-read on every later message. So:
+- Lead with the answer or the result. No preamble ("Great question", "I'll now..."), no closing summary of what you just did unless asked.
+- Don't restate the question, the plan you already shared, or tool output the user can already see.
+- When you change code, don't re-print unchanged code; name the file and line and show only what changed, if anything.
+- Prefer one precise sentence over three loose ones; use lists only when they are shorter.
+This is about wording only: never skip reasoning, verification, tests, caveats, or details the user needs to act.`
+
+const TEXT_FILE = /\.(?!(png|jpe?g|gif|webp|bmp|ico|icns|pdf|ipynb|zip|gz|tar|wasm|woff2?|ttf|otf|mp[34]|mov|db|sqlite)$)[^./]+$/i
+
+// --- session state (a reload starts these over; lasting values go in $.store) ---
+const saved: Record<Feature, number> = { output: 0, reads: 0, lean: 0, tools: 0 }
+const hidden = new Map<string, string>() // server → its hidden instructions
+const restored = new Set<string>()
+const nudged = new Set<number>()
+let promptCounted = false
+
+// Claude often runs several tools at once. Store writes go through this queue
+// so two calls never claim the same log slot or lose each other's counts.
 let queue: Promise<unknown> = Promise.resolve()
 function serial<T>(work: () => Promise<T>): Promise<T> {
   const run = queue.then(work)
@@ -17,8 +48,11 @@ function serial<T>(work: () => Promise<T>): Promise<T> {
   return run
 }
 
-async function isOff($: EngineInterface) {
-  return (await $.store.get('off')) === true
+const num = async ($: EngineInterface, key: string) => ((await $.store.get(key)) as number | undefined) ?? 0
+
+async function isOn($: EngineInterface, feature: Feature) {
+  if ((await $.store.get('off')) === true) return false
+  return (await $.store.get(`off:${feature}`)) !== true
 }
 
 async function saveLog($: EngineInterface, raw: string): Promise<string | undefined> {
@@ -26,7 +60,7 @@ async function saveLog($: EngineInterface, raw: string): Promise<string | undefi
     const home = await $.env.get('HOME')
     if (!home) return undefined
     const slot = await serial(async () => {
-      const n = ((await $.store.get('slot')) as number | undefined) ?? 0
+      const n = await num($, 'slot')
       await $.store.set('slot', n + 1)
       return n % LOG_SLOTS
     })
@@ -39,16 +73,17 @@ async function saveLog($: EngineInterface, raw: string): Promise<string | undefi
   }
 }
 
-async function record($: EngineInterface, savedChars: number) {
-  const saved = tokens(savedChars)
-  sessionSaved += saved
+async function record($: EngineInterface, feature: Feature, savedChars: number) {
+  if (savedChars <= 0) return
+  const n = tokens(savedChars)
+  saved[feature] += n
   await serial(async () => {
-    const total = (((await $.store.get('savedTokens')) as number | undefined) ?? 0) + saved
-    const trims = (((await $.store.get('trims')) as number | undefined) ?? 0) + 1
-    await $.store.set('savedTokens', total)
-    await $.store.set('trims', trims)
+    await $.store.set('savedTokens', (await num($, 'savedTokens')) + n)
+    await $.store.set(`saved:${feature}`, (await num($, `saved:${feature}`)) + n)
+    await $.store.set('trims', (await num($, 'trims')) + 1)
   })
-  $.ui.status(`chroni: ~${fmt(sessionSaved)} tokens saved this session`)
+  const session = Object.values(saved).reduce((a, b) => a + b, 0)
+  $.ui.status(`chroni: ~${fmt(session)} tokens saved this session`)
 }
 
 // Claude Code cuts very long output itself before any hook sees it, leaving
@@ -75,36 +110,109 @@ const note = (linesBefore: number, linesAfter: number, path: string | undefined,
   )
 }
 
+// Which tool servers to hide. Each server is decided once per session, the
+// first time it shows up, so the prompt stays the same and stays cached.
+let policy: { isOn: boolean; used: Record<string, number>; keep: string[] } | undefined
+const decided = new Map<string, boolean>()
+
+async function loadPolicy($: EngineInterface) {
+  policy ??= {
+    isOn: await isOn($, 'tools'),
+    used: ((await $.store.get('mcpUsed')) as Record<string, number> | undefined) ?? {},
+    keep: ((await $.store.get('mcpKeep')) as string[] | undefined) ?? [],
+  }
+  return policy
+}
+
+function isMuted(server: string) {
+  const known = decided.get(server)
+  if (known !== undefined) return known
+  const p = policy
+  const mute =
+    !!p && p.isOn && !isFirstParty(server) && !p.keep.includes(server.toLowerCase()) &&
+    Date.now() - (p.used[server] ?? 0) > MCP_IDLE_MS
+  decided.set(server, mute)
+  return mute
+}
+
+const mutedNow = () => [...decided].filter(([, m]) => m).map(([s]) => s)
+
+async function markUsed($: EngineInterface, server: string) {
+  await serial(async () => {
+    const used = ((await $.store.get('mcpUsed')) as Record<string, number> | undefined) ?? {}
+    used[server] = Date.now()
+    await $.store.set('mcpUsed', used)
+  })
+}
+
+/** The hidden instructions of muted servers named in `text`, once each per session. */
+function restore(text: string) {
+  const back: string[] = []
+  for (const [server, body] of hidden)
+    if (!restored.has(server) && text.includes(`mcp__${server}__`)) {
+      restored.add(server)
+      back.push(`[chroni: instructions for the ${server} tools, hidden earlier to save tokens]\n${body.trim()}`)
+    }
+  return back
+}
+
+async function statsText($: EngineInterface) {
+  const session = Object.values(saved).reduce((a, b) => a + b, 0)
+  const lines = [`Chroni saved ~${fmt(session)} tokens this session, ~${fmt(await num($, 'savedTokens'))} all time.`]
+  for (const f of Object.keys(FEATURES) as Feature[]) {
+    const extra = f === 'lean' ? 'not counted' : `~${fmt(saved[f])} this session, ~${fmt(await num($, `saved:${f}`))} all time`
+    lines.push(`  ${(await isOn($, f)) ? '●' : '○'} ${f.padEnd(6)} ${FEATURES[f]} (${extra})`)
+  }
+  const hiddenNow = mutedNow()
+  if (hiddenNow.length) lines.push(`  Hidden tool servers: ${hiddenNow.join(', ')}. Keep one with /chroni keep <name>.`)
+  try {
+    const { context } = await $.session.usage()
+    if (context.tokens)
+      lines.push(
+        `Context now: ~${fmt(context.tokens)} tokens${context.percent ? ` (${Math.round(context.percent)}% of the window)` : ''}. ` +
+          `Every message re-sends it; /handoff resets it.`,
+      )
+  } catch {}
+  lines.push('Turn one feature off with /chroni <feature> off, or everything with /chroni off.')
+  return lines.join('\n')
+}
+
 export const register: Register = on => {
   on('session.start', async ($, e, next) => {
     await $.command.register({
       name: 'chroni',
-      description: 'Token savings so far, or turn output trimming on/off',
-      argumentHint: '[on|off]',
+      description: 'Token savings so far, or turn Chroni features on/off',
+      argumentHint: '[on|off|output|reads|lean|tools|keep <server>]',
     })
     return next(e)
   })
 
   on('command.run', { command: 'chroni' }, async ($, e) => {
-    const arg = e.args.trim().toLowerCase()
-    if (arg === 'off' || arg === 'on') {
-      await $.store.set('off', arg === 'off')
-      return { text: `chroni: output trimming is ${arg}.` }
+    const [a = '', b = ''] = e.args.trim().split(/\s+/)
+    const cmd = a.toLowerCase()
+    const val = b.toLowerCase()
+    if (cmd === 'off' || cmd === 'on') {
+      await $.store.set('off', cmd === 'off')
+      return { text: `chroni: everything is ${cmd}.` }
     }
-    const total = ((await $.store.get('savedTokens')) as number | undefined) ?? 0
-    const trims = ((await $.store.get('trims')) as number | undefined) ?? 0
-    const state = (await isOff($)) ? 'off' : 'on'
-    return {
-      text:
-        `chroni is ${state}. Saved ~${fmt(sessionSaved)} tokens this session, ` +
-        `~${fmt(total)} tokens all time across ${trims} trimmed outputs.\n` +
-        `Use /chroni off to pause it, /handoff to restart a long session cheaply.`,
+    if (cmd in FEATURES && (val === 'off' || val === 'on')) {
+      await $.store.set(`off:${cmd}`, val === 'off')
+      const later = cmd === 'lean' || cmd === 'tools' ? ' (from the next session on)' : ''
+      return { text: `chroni: ${cmd} is ${val}${later}.` }
     }
+    if ((cmd === 'keep' || cmd === 'unkeep') && val) {
+      const keep = ((await $.store.get('mcpKeep')) as string[] | undefined) ?? []
+      const list = cmd === 'keep' ? [...new Set([...keep, val])] : keep.filter(k => k !== val)
+      await $.store.set('mcpKeep', list)
+      return { text: `chroni: always keeping ${list.length ? list.join(', ') : 'no servers'} (from the next session on).` }
+    }
+    return { text: await statsText($) }
   })
 
+  // 1. Noisy command output.
   on('tool.call', { tool: 'Bash' }, async ($, e, next) => {
     const ran = await next(e)
-    if (ran.deny !== undefined || passThrough(e.command) || (await isOff($))) return ran
+    if (ran.deny !== undefined || passThrough(e.command) || !(await isOn($, 'output'))) return ran
 
     // A failing command (non-zero exit) arrives as one error text that starts
     // with "Exit code N". A hook can't answer with an error of its own, so the
@@ -115,7 +223,7 @@ export const register: Register = on => {
       const s = squeeze(raw)
       if (!s) return ran
       const path = await saveLog($, raw)
-      await record($, s.charsBefore - s.charsAfter)
+      await record($, 'output', s.charsBefore - s.charsAfter)
       const [first, ...rest] = s.text.split('\n')
       return {
         result: {
@@ -138,7 +246,7 @@ export const register: Register = on => {
     const path = await saveLog($, raw)
     const before = (out?.linesBefore ?? 0) + (err?.linesBefore ?? 0)
     const after = (out?.linesAfter ?? 0) + (err?.linesAfter ?? 0)
-    await record($, (out ? out.charsBefore - out.charsAfter : 0) + (err ? err.charsBefore - err.charsAfter : 0))
+    await record($, 'output', (out ? out.charsBefore - out.charsAfter : 0) + (err ? err.charsBefore - err.charsAfter : 0))
 
     return {
       result: {
@@ -148,5 +256,104 @@ export const register: Register = on => {
       },
       context: ran.context,
     }
+  }).catch(($, e, next) => next(e))
+
+  // 2. Big file reads: the first lines plus a map of the rest, instead of all of it.
+  on('tool.call', { tool: 'Read' }, async ($, e, next) => {
+    const isWhole = e.offset === undefined && e.limit === undefined && !e.allow_large && !e.pages
+    if (!isWhole || !TEXT_FILE.test(e.file_path) || !(await isOn($, 'reads'))) return next(e)
+    let text: string
+    try {
+      text = (await $.fs.read(e.file_path)) as string
+    } catch {
+      return next(e)
+    }
+    const lines = text.split('\n')
+    if (lines.length <= READ_MIN_LINES) return next(e)
+    const map = outline(e.file_path, text)
+    if (!map) return next(e)
+
+    const ran = await next({ ...e, limit: READ_HEAD_LINES })
+    if (ran.deny !== undefined || ran.isError === true) return ran
+    if ((ran.result as { type?: string } | undefined)?.type !== 'text') return ran
+
+    const guide =
+      `[chroni: ${e.file_path} has ${lines.length.toLocaleString()} lines. To save tokens you got lines 1–${READ_HEAD_LINES} ` +
+      `and this map of the rest (line: what starts there). Read the parts you need with offset/limit, ` +
+      `or pass allow_large: true if you truly need the whole file at once.]\n${map}`
+    const shown = lines.slice(0, READ_HEAD_LINES).join('\n').length
+    await record($, 'reads', text.length - shown - guide.length)
+    return { ...ran, context: [...(ran.context ?? []), guide] }
+  }).catch(($, e, next) => next(e))
+
+  // 3. Lean replies, and 4. the tool-server diet, both in the system prompt.
+  on('prompt.compose', async ($, e, next) => {
+    const composed = await next(e)
+    await loadPolicy($)
+    let removedChars = 0
+    const sections = composed.sections.map(section => {
+      const m = muteInstructions(section.text, isMuted)
+      if (!m) return section
+      for (const b of m.removed) hidden.set(b.server, b.body)
+      removedChars += section.text.length - m.text.length
+      return { ...section, text: m.text }
+    })
+    // The prompt is re-sent on every request; count it once per session.
+    if (removedChars > 0 && !promptCounted) {
+      promptCounted = true
+      await record($, 'tools', removedChars)
+    }
+    if (await isOn($, 'lean')) sections.push({ id: 'chroni:lean', text: LEAN, scope: 'session' as const })
+    return { sections }
+  }).catch(($, e, next) => next(e))
+
+  // The deferred tool listing (and some instructions) arrive as reminders.
+  on('prompt.attachment', async ($, e, next) => {
+    const got = await next(e)
+    if (typeof got.text !== 'string') return got
+    await loadPolicy($)
+    const isListing = e.type.includes('deferred_tools') || /^mcp__/m.test(got.text)
+    const m = isListing ? muteListing(got.text, isMuted) : muteInstructions(got.text, isMuted)
+    if (!m) return got
+    if ('removed' in m) for (const b of m.removed) hidden.set(b.server, b.body)
+    await record($, 'tools', got.text.length - m.text.length)
+    return { ...got, text: m.text }
+  }).catch(($, e, next) => next(e))
+
+  // When Claude reaches for a hidden server, hand its instructions back.
+  on('tool.call', { tool: 'ToolSearch' }, async ($, e, next) => {
+    const ran = await next(e)
+    if (ran.deny !== undefined || hidden.size === 0) return ran
+    const back = restore(`${ran.text ?? ''}\n${JSON.stringify(e)}`)
+    return back.length ? { ...ran, context: [...(ran.context ?? []), ...back] } : ran
+  }).catch(($, e, next) => next(e))
+
+  on('tool.call', async ($, e, next) => {
+    const server = serverOf(e.tool)
+    if (!server) return next(e)
+    const ran = await next(e)
+    await markUsed($, server)
+    if (ran.deny !== undefined) return ran
+    const back = restore(`mcp__${server}__`)
+    return back.length ? { ...ran, context: [...(ran.context ?? []), ...back] } : ran
+  }).catch(($, e, next) => next(e))
+
+  // 5. When the conversation gets big, suggest /handoff (each later message re-sends it all).
+  on('turn.complete', async ($, e, next) => {
+    const done = await next(e)
+    try {
+      const { context } = await $.session.usage()
+      const size = context.tokens ?? 0
+      const at = NUDGE_AT.filter(n => size >= n && !nudged.has(n)).pop()
+      if (at) {
+        for (const n of NUDGE_AT) if (n <= at) nudged.add(n)
+        $.ui.toast(
+          `chroni: this chat is ~${fmt(size)} tokens, re-sent with every message. ` +
+            `/handoff then /clear makes the next messages ~90% cheaper.`,
+          { timeoutMs: 12_000 },
+        )
+      }
+    } catch {}
+    return done
   }).catch(($, e, next) => next(e))
 }

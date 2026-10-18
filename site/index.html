@@ -125,6 +125,14 @@ input[type=range]{width:100%;accent-color:var(--purple);height:30px}
 .vs .card{padding:14px 8px;text-align:center;min-width:0}
 .vs .big{font-size:clamp(22px,6.5vw,40px)}
 
+/* five */
+.five{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,200px),1fr));gap:18px;margin-top:40px}
+.fivecard{padding:22px;position:relative;transition:transform .2s;border-top:12px solid var(--c)}
+.fivecard:hover{transform:translateY(-6px) rotate(-1deg)}
+.fivecard .pct{display:inline-block;font-weight:800;font-size:15px;background:var(--c);border:2px solid var(--ink);border-radius:999px;padding:2px 10px;margin-bottom:12px}
+.fivecard h3{font-size:22px;margin-bottom:8px}
+.fivecard p{margin:0;font-size:16px}
+
 /* how */
 .grid3{display:grid;grid-template-columns:repeat(3,1fr);gap:22px;margin-top:40px}
 @media (max-width:860px){.grid3{grid-template-columns:1fr}}
@@ -203,7 +211,7 @@ footer .logo{justify-content:center;margin-bottom:10px}
     </a>
     <div class="links">
       <a href="#demo">Try it</a>
-      <a href="#how">How it works</a>
+      <a href="#five">5 ways</a>
       <a href="#proof">Does it work?</a>
       <a class="btn" href="#install" style="padding:8px 18px;font-size:16px">Install free</a>
     </div>
@@ -213,7 +221,7 @@ footer .logo{justify-content:center;margin-bottom:10px}
     <div>
       <span class="pill">A free plugin for Claude Code</span>
       <h1>Use Claude <span class="squish">longer.</span></h1>
-      <p class="lead">Most of your Claude usage is Claude <b>reading junk</b>: giant build logs, install spam, endless file lists. Chroni zaps the noise before Claude sees it and keeps every error. Same smart Claude, way fewer tokens.</p>
+      <p class="lead">Most of your Claude usage is Claude <b>reading junk</b>: giant build logs, whole files, tool lists, and the entire chat, re-sent with every message. Chroni zaps the waste in five places and keeps every error. Same smart Claude, way fewer tokens.</p>
       <div class="ctas">
         <a class="btn pink" href="#demo">⚡ Zap a log</a>
         <a class="btn white" href="#install">Install in 10 seconds</a>
@@ -314,9 +322,24 @@ footer .logo{justify-content:center;margin-bottom:10px}
   </div>
 </section>
 
+<section id="five">
+  <div class="wrap">
+    <div class="kicker">Five ways it saves</div>
+    <h2>Cuts the reading, not the thinking.</h2>
+    <p class="sub">Each one targets a different place your tokens leak. All on by default, each one switchable with <b>/chroni &lt;name&gt; off</b>.</p>
+    <div class="five">
+      <div class="card fivecard reveal" style="--c:var(--pink)"><div class="pct">50–98%</div><h3>🧹 Noisy output</h3><p>Build logs, installs and test runs trimmed to the start, the end and every error. Full log saved.</p></div>
+      <div class="card fivecard reveal" style="--c:var(--yellow)"><div class="pct">~60–80%</div><h3>🗺️ Big file reads</h3><p>A 900-line file? Claude gets the top plus a map of every function, then reads just the part it needs.</p></div>
+      <div class="card fivecard reveal" style="--c:var(--sky)"><div class="pct">every message</div><h3>🔌 Unused tool servers</h3><p>Servers you haven't touched in 2 weeks stop sending their long instructions each time. They still work.</p></div>
+      <div class="card fivecard reveal" style="--c:var(--mint)"><div class="pct">fewer words</div><h3>✂️ Lean replies</h3><p>No preambles, no recaps, no re-printed code. The reasoning and checks stay exactly the same.</p></div>
+      <div class="card fivecard reveal" style="--c:var(--orange)"><div class="pct">~90%+</div><h3>🔁 Long chats</h3><p>When a chat gets huge, Chroni taps you on the shoulder. /handoff + /clear and every next message is tiny.</p></div>
+    </div>
+  </div>
+</section>
+
 <section id="how" style="background:#fff;border-block:3px solid var(--ink)">
   <div class="wrap">
-    <div class="kicker">How it works</div>
+    <div class="kicker">How the log zapper works</div>
     <h2>Zaps the junk. Never the brains.</h2>
     <p class="sub">When a command spits out a wall of text, Chroni keeps the parts that matter and swaps the rest for a short note.</p>
     <div class="grid3">
@@ -376,8 +399,8 @@ footer .logo{justify-content:center;margin-bottom:10px}
       </div>
       <div class="card reveal">
         <h3 style="font-size:24px"><span class="num">2</span>Check the counter</h3>
-        <p>Type <b>/chroni</b> any time to see how many tokens it has saved, this session and all time.</p>
-        <div class="mini"><span class="p">&gt; /chroni</span><br>chroni is on. Saved ~7.8k tokens this session,<br>~41.2k tokens all time across 12 trimmed outputs.</div>
+        <p>Type <b>/chroni</b> any time to see how many tokens each feature has saved, this session and all time.</p>
+        <div class="mini"><span class="p">&gt; /chroni</span><br>Chroni saved ~18.2k tokens this session, ~96.4k all time.<br>&nbsp;&nbsp;● output trims noisy command output (~7.8k)<br>&nbsp;&nbsp;● reads&nbsp; maps big files (~6.1k)<br>&nbsp;&nbsp;● lean&nbsp;&nbsp; shorter replies (not counted)<br>&nbsp;&nbsp;● tools&nbsp; hides unused tool servers (~4.3k)<br><span class="p">(example numbers)</span></div>
         <p style="margin-top:14px">Want the raw output for one command? Put <b>CHRONI=off</b> in front. Want it off entirely? <b>/chroni off</b>.</p>
       </div>
     </div>
@@ -389,7 +412,9 @@ footer .logo{justify-content:center;margin-bottom:10px}
     <div class="kicker">Questions</div>
     <h2>Fair questions.</h2>
     <details class="reveal"><summary>Does it make Claude dumber?</summary><p>No. It only removes repeated lines, progress bars and the boring middle of long logs. Every error and warning stays, and the full output is one file read away. When Claude reads files, diffs or search results on purpose, Chroni doesn't touch them.</p></details>
-    <details class="reveal"><summary>How much will I actually save?</summary><p>It depends on how noisy your work is. On commands like builds, installs, test runs and big listings, it's usually 30–98% of that output. Small commands aren't changed at all. Type /chroni to see your real number.</p></details>
+    <details class="reveal"><summary>How much will I actually save?</summary><p>It depends on your work. Noisy builds save 50–98% of that output, big file reads about 60–80%, and a /handoff makes each later message around 90% cheaper. Short Q&amp;A saves the least. Type /chroni to see your real numbers, per feature.</p></details>
+    <details class="reveal"><summary>Won't lean replies make Claude worse?</summary><p>It only changes wording: no preambles, no recaps of what it just did, no re-printing code that didn't change. Claude is told never to skip reasoning, tests, caveats or anything you need. Don't like it? /chroni lean off.</p></details>
+    <details class="reveal"><summary>What if I need a tool server Chroni hid?</summary><p>Just ask for it. The tools still work; Claude finds them with its tool search, and Chroni hands back their instructions the moment it does. Servers you use stay visible for two weeks, and /chroni keep &lt;name&gt; keeps one forever.</p></details>
     <details class="reveal"><summary>Does it send my code anywhere?</summary><p>No. Everything runs on your machine, inside Claude Code. Full logs are saved in ~/.claude/chroni/logs and rotate, so they don't pile up.</p></details>
     <details class="reveal"><summary>What about really huge outputs?</summary><p>Past about 30KB, Claude Code steps in before any plugin can: it saves the output to a file and shows Claude a short preview. For failing commands it cuts out the middle. When that happens, Chroni's note tells Claude what was cut and how to get it back, so it never thinks it saw everything when it didn't.</p></details>
     <details class="reveal"><summary>What's /handoff?</summary><p>When a session gets long, every message re-sends the whole history. /handoff has Claude write a short summary file; then you /clear and continue from it with a fraction of the context.</p></details>

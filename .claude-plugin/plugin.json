@@ -1,7 +1,7 @@
 {
   "name": "chroni",
-  "version": "0.1.0",
-  "description": "Cuts Claude Code token use by trimming noisy command output (logs, installs, test runs) while keeping every error, with the full output one Read away.",
+  "version": "0.2.0",
+  "description": "Use Claude Code longer: trims noisy output, maps big files, hides unused tool servers, keeps replies lean, and nudges you to hand off long chats. Keeps every error.",
   "author": {
     "name": "Virat Kaukuntla"
   },
