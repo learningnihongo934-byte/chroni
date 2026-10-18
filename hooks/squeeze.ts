@@ -36,7 +36,7 @@ const ANSI = /\x1b\[[0-9;?]*[ -\/]*[@-~]|\x1b\][^\x07\x1b]*(?:\x07|\x1b\\)|\x1b[
 
 // Lines worth keeping from the middle of a long log.
 const SIGNAL =
-  /\b(errors?|err!|fail(ed|ure|ures|ing)?|fatal|panic(ked)?|exception|traceback|assert(ion)?(error)?|warn(ing)?s?|denied|refused|not found|cannot|can't|unable|undefined|segmentation|timed? ?out|killed|abort(ed)?|expected|received|missing|invalid|conflict)\b|✗|✖|❌|⨯|^\s*E\s{2,}|^\s*>\s+\d+\s*\|/i
+  /\b(errors?|err!|fail(ed|ure|ures|ing)?|fatal|panic(ked)?|exception|traceback|assert(ion)?(error)?|warn(ing)?s?|denied|refused|not found|cannot|can't|unable|undefined|segmentation|timed? ?out|killed|abort(ed)?|expected|received|missing|invalid|conflict)\b|err!|✗|✖|❌|⨯|^\s*E\s{2,}|^\s*>\s+\d+\s*\|/i
 
 /** Strip colors and keep only the final state of carriage-return progress bars. */
 export function clean(text: string): string[] {
@@ -72,8 +72,12 @@ export function collapse(lines: string[]): string[] {
     j = i + 1
     while (j < lines.length && lines[j].trim() !== '' && shape(lines[j]) === s) j++
     const run = j - i
-    if (run >= 8 && !SIGNAL.test(lines[i])) {
-      out.push(lines[i], lines[i + 1], `… (${run - 3} similar lines)`, lines[j - 1])
+    // Runs of warnings that differ only in numbers (160 "npm WARN deprecated
+    // pkg@1.2.3") collapse too, but only long ones, keeping more of each.
+    const isSignal = SIGNAL.test(lines[i])
+    if (run >= (isSignal ? 20 : 8)) {
+      const keep = isSignal ? 5 : 2
+      out.push(...lines.slice(i, i + keep), `… (${run - keep - 1} similar lines)`, lines[j - 1])
       i = j
       continue
     }

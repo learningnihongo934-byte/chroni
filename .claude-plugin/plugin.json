@@ -2,7 +2,17 @@
   "name": "chroni",
   "version": "0.1.0",
   "description": "Cuts Claude Code token use by trimming noisy command output (logs, installs, test runs) while keeping every error, with the full output one Read away.",
-  "author": { "name": "Virat Kaukuntla" },
+  "author": {
+    "name": "Virat Kaukuntla"
+  },
   "license": "MIT",
-  "keywords": ["tokens", "usage", "context", "cost", "compression"]
+  "keywords": [
+    "tokens",
+    "usage",
+    "context",
+    "cost",
+    "compression"
+  ],
+  "homepage": "https://chroni.web.app",
+  "repository": "https://github.com/learningnihongo934-byte/chroni"
 }

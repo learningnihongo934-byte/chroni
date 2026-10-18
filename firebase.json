@@ -1,0 +1,10 @@
+{
+  "hosting": {
+    "site": "chroni",
+    "public": "site",
+    "cleanUrls": true,
+    "headers": [
+      { "source": "**/*.@(js|html)", "headers": [{ "key": "Cache-Control", "value": "public, max-age=300" }] }
+    ]
+  }
+}
