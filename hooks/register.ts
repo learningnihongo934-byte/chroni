@@ -7,6 +7,16 @@ const LOG_SLOTS = 200
 
 let sessionSaved = 0
 
+// Claude often runs several commands at once. Store reads and writes go
+// through this queue so two outputs never claim the same log slot or lose
+// each other's savings.
+let queue: Promise<unknown> = Promise.resolve()
+function serial<T>(work: () => Promise<T>): Promise<T> {
+  const run = queue.then(work)
+  queue = run.catch(() => undefined)
+  return run
+}
+
 async function isOff($: EngineInterface) {
   return (await $.store.get('off')) === true
 }
@@ -15,8 +25,11 @@ async function saveLog($: EngineInterface, raw: string): Promise<string | undefi
   try {
     const home = await $.env.get('HOME')
     if (!home) return undefined
-    const slot = (((await $.store.get('slot')) as number | undefined) ?? 0) % LOG_SLOTS
-    await $.store.set('slot', slot + 1)
+    const slot = await serial(async () => {
+      const n = ((await $.store.get('slot')) as number | undefined) ?? 0
+      await $.store.set('slot', n + 1)
+      return n % LOG_SLOTS
+    })
     const path = `${home}/.claude/chroni/logs/output-${slot}.log`
     // $.fs.write caps at 4 MiB; leave room for multi-byte characters.
     await $.fs.write(path, raw.length > 3_500_000 ? raw.slice(-3_500_000) : raw)
@@ -29,10 +42,12 @@ async function saveLog($: EngineInterface, raw: string): Promise<string | undefi
 async function record($: EngineInterface, savedChars: number) {
   const saved = tokens(savedChars)
   sessionSaved += saved
-  const total = (((await $.store.get('savedTokens')) as number | undefined) ?? 0) + saved
-  const trims = (((await $.store.get('trims')) as number | undefined) ?? 0) + 1
-  await $.store.set('savedTokens', total)
-  await $.store.set('trims', trims)
+  await serial(async () => {
+    const total = (((await $.store.get('savedTokens')) as number | undefined) ?? 0) + saved
+    const trims = (((await $.store.get('trims')) as number | undefined) ?? 0) + 1
+    await $.store.set('savedTokens', total)
+    await $.store.set('trims', trims)
+  })
   $.ui.status(`chroni: ~${fmt(sessionSaved)} tokens saved this session`)
 }
 

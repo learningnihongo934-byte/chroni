@@ -90,7 +90,10 @@ section{padding:90px 0}
 .screen .ln{white-space:pre-wrap;word-break:break-all}
 .screen .ln.err{color:#FF8FB1;font-weight:600;background:rgba(255,93,143,.12);border-radius:4px}
 .screen .ln.note{color:#C9BCFF;background:rgba(123,92,255,.22);border-radius:6px;padding:4px 6px;margin-bottom:6px}
-.screen .ln.hidden{color:#7E76A3;font-style:italic}
+.screen .ln.hidden{color:#A79FD0;font-style:italic}
+.legend{display:flex;flex-wrap:wrap;gap:8px 18px;margin-top:12px;font-size:15px;font-weight:700}
+.legend span{display:inline-flex;align-items:center;gap:7px}
+.legend i{width:14px;height:14px;border-radius:4px;border:2px solid var(--ink);display:inline-block}
 .screen .ln.pop{animation:popin .45s cubic-bezier(.3,1.8,.5,1) both}
 @keyframes popin{from{transform:scale(.6);opacity:0}}
 .screen textarea{width:100%;height:100%;min-height:380px;background:transparent;border:2px dashed #5A4F86;border-radius:10px;color:var(--termText);font:inherit;padding:10px;resize:none;outline:none}
@@ -268,6 +271,11 @@ footer .logo{justify-content:center;margin-bottom:10px}
           <div class="beam" id="beam"></div>
           <div class="screen" id="screen" tabindex="0" aria-live="polite"></div>
         </div>
+        <div class="legend" id="legend" hidden>
+          <span><i style="background:#FF8FB1"></i>Errors in the sample log, kept on purpose</span>
+          <span><i style="background:#C9BCFF"></i>Chroni's note to Claude</span>
+          <span><i style="background:#A79FD0"></i>Where the noise was zapped</span>
+        </div>
       </div>
       <div class="side">
         <button class="btn zapbtn" id="zap"><span class="ico">⚡</span> <span id="zapLabel">ZAP IT</span></button>
@@ -294,7 +302,7 @@ footer .logo{justify-content:center;margin-bottom:10px}
     <div class="card reread" id="reread">
       <div>
         <h3 style="font-size:30px">The sneaky part: it gets re-read.</h3>
-        <p style="margin:10px 0 18px">Claude doesn't read a log once. It's part of the conversation, so it's sent again with <b>every message after it</b>. Drag to see what one noisy build costs over a session.</p>
+        <p style="margin:10px 0 18px">Claude doesn't read a log once. It's part of the conversation, so it's sent again with <b>every message after it</b>. Drag to see what the log above costs over a session.</p>
         <label for="msgs" style="font-weight:800">Messages after the build: <span id="msgsVal">20</span></label>
         <input type="range" id="msgs" min="1" max="100" value="20">
       </div>
@@ -465,6 +473,7 @@ const lineClass = l => l.startsWith('[chroni') ? 'note' : l.startsWith('… (') 
 function load(key) {
   current = key
   zapped = false
+  $('#legend').hidden = true
   $('#termTitle').textContent = PRESETS[key].cmd
   $('#zapLabel').textContent = 'ZAP IT'
   document.querySelectorAll('#presetTabs .tab').forEach(t => t.setAttribute('aria-selected', t.dataset.k === key))
@@ -492,18 +501,24 @@ for (const [k, p] of Object.entries(PRESETS)) {
 }
 
 // ---------- numbers ----------
+// Counts a number up or down. A newer count on the same element cancels an
+// older one, and the final value is set even if animation frames are paused.
 function countTo(el, to, ms = 900) {
   const from = Number(el.dataset.v || 0)
   el.dataset.v = to
-  if (reduce) { el.textContent = to.toLocaleString(); return }
+  const id = (el._count = (el._count || 0) + 1)
+  const done = () => { if (el._count === id) el.textContent = to.toLocaleString() }
+  if (reduce) return done()
   const t0 = performance.now()
   const step = t => {
+    if (el._count !== id) return
     const k = Math.min(1, (t - t0) / ms)
     const e = 1 - Math.pow(1 - k, 3)
     el.textContent = Math.round(from + (to - from) * e).toLocaleString()
     if (k < 1) requestAnimationFrame(step)
   }
   requestAnimationFrame(step)
+  setTimeout(done, ms + 100)
 }
 
 let lastBefore = 0, lastAfter = 0
@@ -516,11 +531,14 @@ function setMeter(before, after, reset) {
   updateCost()
 }
 
+// What the log on screen costs if it stays in the conversation for n messages.
 function updateCost() {
   const n = Number($('#msgs').value)
   $('#msgsVal').textContent = n
-  const b = lastBefore || tokens((PRESETS.build.text()).length)
-  const a = zapped ? lastAfter : (squeeze(PRESETS.build.text()) ? tokens(squeeze(PRESETS.build.text()).text.length + 220) : b)
+  const log = original.trim() ? original : PRESETS.build.text()
+  const s = squeeze(log)
+  const b = tokens(log.length)
+  const a = s ? tokens(s.text.length + 220) : b
   countTo($('#costWithout'), b * n, 400)
   countTo($('#costWith'), a * n, 400)
 }
@@ -620,6 +638,7 @@ $('#zap').onclick = e => {
     render(out, lineClass, true)
     screen.scrollTop = 0
     zapped = true
+    $('#legend').hidden = false
     $('#zapLabel').textContent = 'RESET'
     const errs = original.split('\n').filter(l => SIG.test(l)).length
     $('#keptErrors').textContent = `All ${errs} error line${errs === 1 ? '' : 's'}`
@@ -696,7 +715,17 @@ document.addEventListener('click', async e => {
   const b = e.target.closest('[data-copy]')
   if (!b) return
   const text = document.getElementById(b.dataset.copy).textContent
-  try { await navigator.clipboard.writeText(text); b.textContent = 'Copied!'; boop(880) } catch { b.textContent = 'Select & copy' }
+  let ok = false
+  try { await navigator.clipboard.writeText(text); ok = true } catch {
+    // Older browsers, or clipboard access blocked: copy through a hidden field.
+    const ta = Object.assign(document.createElement('textarea'), { value: text })
+    ta.style.cssText = 'position:fixed;opacity:0'
+    document.body.appendChild(ta); ta.select()
+    try { ok = document.execCommand('copy') } catch {}
+    ta.remove()
+  }
+  b.textContent = ok ? 'Copied!' : 'Select & copy'
+  if (ok) boop(880)
   setTimeout(() => b.textContent = 'Copy', 1600)
 })
 

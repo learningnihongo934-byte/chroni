@@ -39,6 +39,10 @@ const ANSI = /\x1b\[[0-9;?]*[ -\/]*[@-~]|\x1b\][^\x07\x1b]*(?:\x07|\x1b\\)|\x1b[
 const SIGNAL =
   /\b(errors?|err!|fail(ed|ure|ures|ing)?|fatal|panic(ked)?|exception|traceback|assert(ion)?(error)?|warn(ing)?s?|denied|refused|not found|cannot|can't|unable|undefined|segmentation|timed? ?out|killed|abort(ed)?|expected|received|missing|invalid|conflict)\b|err!|✗|✖|❌|⨯|^\s*E\s{2,}|^\s*>\s+\d+\s*\|/i
 
+// The subset of SIGNAL that means something went wrong, as opposed to a warning.
+const ERROR_LINE =
+  /\b(errors?|err!|fail(ed|ure|ures|ing)?|fatal|panic(ked)?|exception|traceback|assert(ion)?(error)?|segmentation|killed|abort(ed)?)\b|err!|✗|✖|❌|⨯|^\s*E\s{2,}/i
+
 /** Strip colors and keep only the final state of carriage-return progress bars. */
 export function clean(text        )           {
   return text
@@ -46,7 +50,10 @@ export function clean(text        )           {
     .split('\n')
     .map(line => {
       const parts = line.split('\r')
-      for (let i = parts.length - 1; i >= 0; i--) if (parts[i].trim() !== '') return parts[i].trimEnd()
+      for (let i = parts.length - 1; i >= 0; i--) {
+        const part = parts[i] 
+        if (part.trim() !== '') return part.trimEnd()
+      }
       return ''
     })
 }
@@ -61,28 +68,31 @@ export function collapse(lines          )           {
   const out           = []
   let i = 0
   while (i < lines.length) {
+    const line = lines[i] 
     let j = i + 1
-    while (j < lines.length && lines[j] === lines[i]) j++
+    while (j < lines.length && lines[j] === line) j++
     const repeats = j - i
     if (repeats >= 3) {
-      out.push(lines[i], `… (previous line repeated ${repeats - 1} more times)`)
+      out.push(line, `… (previous line repeated ${repeats - 1} more times)`)
       i = j
       continue
     }
-    const s = shape(lines[i])
+    const s = shape(line)
     j = i + 1
-    while (j < lines.length && lines[j].trim() !== '' && shape(lines[j]) === s) j++
+    while (j < lines.length && lines[j] .trim() !== '' && shape(lines[j] ) === s) j++
     const run = j - i
-    // Runs of warnings that differ only in numbers (160 "npm WARN deprecated
-    // pkg@1.2.3") collapse too, but only long ones, keeping more of each.
-    const isSignal = SIGNAL.test(lines[i])
-    if (run >= (isSignal ? 20 : 8)) {
-      const keep = isSignal ? 5 : 2
-      out.push(...lines.slice(i, i + keep), `… (${run - keep - 1} similar lines)`, lines[j - 1])
+    // Errors and failures are never collapsed: their numbers (line, column,
+    // test id) are the point. Long runs of warnings that differ only in
+    // numbers (160 "npm WARN deprecated pkg@1.2.3") do collapse, keeping more.
+    const isError = ERROR_LINE.test(line)
+    const isWarning = !isError && SIGNAL.test(line)
+    if (!isError && run >= (isWarning ? 20 : 8)) {
+      const keep = isWarning ? 5 : 2
+      out.push(...lines.slice(i, i + keep), `… (${run - keep - 1} similar lines)`, lines[j - 1] )
       i = j
       continue
     }
-    out.push(lines[i])
+    out.push(line)
     i++
   }
   // Squash runs of blank lines to one.
@@ -100,7 +110,7 @@ export function window(lines          , o                )           {
   let signals = 0
   let extraSignals = 0
   for (let k = o.headLines; k < tailStart; k++) {
-    if (!SIGNAL.test(lines[k])) continue
+    if (!SIGNAL.test(lines[k] )) continue
     if (signals >= o.maxSignalLines) {
       extraSignals++
       continue
@@ -113,7 +123,7 @@ export function window(lines          , o                )           {
   let last = o.headLines - 1
   for (const k of [...keep].sort((a, b) => a - b)) {
     if (k - last > 1) middle.push(`… (${k - last - 1} lines hidden)`)
-    middle.push(lines[k])
+    middle.push(lines[k] )
     last = k
   }
   if (tailStart - last > 1) middle.push(`… (${tailStart - last - 1} lines hidden)`)

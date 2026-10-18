@@ -86,3 +86,30 @@ test('says so when Claude Code already cut part of the output', async ($, on) =>
   expect(out).toContain('cmd > /tmp/out.log 2>&1')
   expect(out).not.toContain('Full output:')
 })
+
+test('never collapses a run of errors, even ones that differ only in numbers', async ($, on) => {
+  const errors = Array.from({ length: 30 }, (_, i) => `src/user.ts(${i * 7 + 3},5): error TS2322: Type 'string' is not assignable to type 'number'.`)
+  const log = [...Array.from({ length: 300 }, (_, i) => `compiling module ${i}`), ...errors, 'Found 30 errors.'].join('\n')
+  world(on, { stdout: log })
+  const ran = await $.tool.call({ tool: 'Bash', command: 'npx tsc' })
+  const out = (ran.result as { stdout: string }).stdout
+  for (const line of errors) expect(out).toContain(line)
+})
+
+test('collapses a long run of near-identical warnings', async ($, on) => {
+  const log = [...Array.from({ length: 160 }, (_, i) => `npm WARN deprecated pkg-${i}@1.${i}.0: no longer supported`), 'npm ERR! code ERESOLVE', 'added 900 packages'].join('\n')
+  world(on, { stdout: log })
+  const ran = await $.tool.call({ tool: 'Bash', command: 'npm install' })
+  const out = (ran.result as { stdout: string }).stdout
+  expect(out).toContain('similar lines')
+  expect(out).toContain('npm ERR! code ERESOLVE')
+  expect(out.split('\n').length).toBeLessThan(20)
+})
+
+test('parallel commands each get their own log file', async ($, on) => {
+  const writes = world(on, { stdout: noisy })
+  const runs = await Promise.all(Array.from({ length: 4 }, (_, i) => $.tool.call({ tool: 'Bash', command: `npm run build:${i}` })))
+  const paths = runs.map(r => /Full output: (\S+)/.exec((r.result as { stdout: string }).stdout)?.[1])
+  expect(new Set(paths).size).toBe(4)
+  expect(new Set(writes.map(w => w.path)).size).toBe(4)
+})
