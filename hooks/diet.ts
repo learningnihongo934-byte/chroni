@@ -14,19 +14,25 @@ export const normalize = (name: string) => name.replace(/[^A-Za-z0-9-]/g, '_')
 
 export type Instructions = { header: string; server: string; body: string }
 
-/** Splits the "# MCP Server Instructions" text into one block per server. */
-export function splitInstructions(text: string) {
+/**
+ * Splits the "# MCP Server Instructions" text into one block per server.
+ * A server's own instructions may hold "# " and "## " headings of their own,
+ * so a block only ends at a "## " heading that names a known server.
+ */
+export function splitInstructions(text: string, isServer: (name: string) => boolean = () => true) {
   const start = text.indexOf('# MCP Server Instructions')
   if (start < 0) return undefined
-  // The region runs to the next top-level heading, or the end of the text.
-  const next = text.slice(start + 1).search(/^# /m)
-  const end = next < 0 ? text.length : start + 1 + next
-  const parts = text.slice(start, end).split(/^(?=## )/m)
-  const blocks: Instructions[] = parts.slice(1).map(body => {
+  const region = text.slice(start)
+  const starts = [...region.matchAll(/^## (.+)$/gm)]
+    .filter(m => isServer(normalize(m[1]!.trim())))
+    .map(m => m.index!)
+  if (starts.length === 0) return undefined
+  const blocks: Instructions[] = starts.map((at, i) => {
+    const body = region.slice(at, starts[i + 1] ?? region.length)
     const header = /^## (.+)$/m.exec(body)?.[1]?.trim() ?? ''
     return { header, server: normalize(header), body }
   })
-  return { before: text.slice(0, start) + (parts[0] ?? ''), blocks, after: text.slice(end) }
+  return { before: text.slice(0, start) + region.slice(0, starts[0]), blocks, after: '' }
 }
 
 export function stubLine(muted: string[]) {
@@ -37,8 +43,8 @@ export function stubLine(muted: string[]) {
 }
 
 /** Removes muted servers' blocks; returns the new text and what was removed. */
-export function muteInstructions(text: string, isMuted: (server: string) => boolean) {
-  const split = splitInstructions(text)
+export function muteInstructions(text: string, isMuted: (server: string) => boolean, isServer?: (name: string) => boolean) {
+  const split = splitInstructions(text, isServer)
   if (!split) return undefined
   const removed = split.blocks.filter(b => isMuted(b.server))
   if (removed.length === 0) return undefined

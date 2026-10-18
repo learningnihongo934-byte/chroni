@@ -34,7 +34,9 @@ const TEXT_FILE = /\.(?!(png|jpe?g|gif|webp|bmp|ico|icns|pdf|ipynb|zip|gz|tar|wa
 
 // --- session state (a reload starts these over; lasting values go in $.store) ---
 const saved: Record<Feature, number> = { output: 0, reads: 0, lean: 0, tools: 0 }
-const hidden = new Map<string, string>() // server → its hidden instructions
+// server → its hidden instructions; saved in $.store too, so a reload keeps them.
+const hidden = new Map<string, string>()
+const servers = new Set<string>() // tool servers this session offers
 const restored = new Set<string>()
 const nudged = new Set<number>()
 let promptCounted = false
@@ -116,6 +118,11 @@ let policy: { isOn: boolean; used: Record<string, number>; keep: string[] } | un
 const decided = new Map<string, boolean>()
 
 async function loadPolicy($: EngineInterface) {
+  if (!policy) {
+    const saved = ((await $.store.get('mcpHidden')) as Record<string, string> | undefined) ?? {}
+    for (const [k, v] of Object.entries(saved)) if (!hidden.has(k)) hidden.set(k, v)
+    for (const s of ((await $.store.get('mcpServers')) as string[] | undefined) ?? []) servers.add(s)
+  }
   policy ??= {
     isOn: await isOn($, 'tools'),
     used: ((await $.store.get('mcpUsed')) as Record<string, number> | undefined) ?? {},
@@ -134,6 +141,14 @@ function isMuted(server: string) {
   decided.set(server, mute)
   return mute
 }
+
+async function remember($: EngineInterface, removed: { server: string; body: string }[]) {
+  if (!removed.length) return
+  for (const b of removed) hidden.set(b.server, b.body)
+  await serial(async () => $.store.set('mcpHidden', Object.fromEntries(hidden)))
+}
+
+const isServer = (name: string) => servers.size === 0 || servers.has(name)
 
 const mutedNow = () => [...decided].filter(([, m]) => m).map(([s]) => s)
 
@@ -270,7 +285,7 @@ export const register: Register = on => {
     }
     const lines = text.split('\n')
     if (lines.length <= READ_MIN_LINES) return next(e)
-    const map = outline(e.file_path, text)
+    const map = outline(e.file_path, text, 150, READ_HEAD_LINES)
     if (!map) return next(e)
 
     const ran = await next({ ...e, limit: READ_HEAD_LINES })
@@ -290,14 +305,21 @@ export const register: Register = on => {
   on('prompt.compose', async ($, e, next) => {
     const composed = await next(e)
     await loadPolicy($)
+    const offered = e.tools.map(serverOf).filter((x): x is string => !!x)
+    if (offered.some(x => !servers.has(x))) {
+      for (const x of offered) servers.add(x)
+      await serial(async () => $.store.set('mcpServers', [...servers]))
+    }
     let removedChars = 0
+    const removed: { server: string; body: string }[] = []
     const sections = composed.sections.map(section => {
-      const m = muteInstructions(section.text, isMuted)
+      const m = muteInstructions(section.text, isMuted, isServer)
       if (!m) return section
-      for (const b of m.removed) hidden.set(b.server, b.body)
+      removed.push(...m.removed)
       removedChars += section.text.length - m.text.length
       return { ...section, text: m.text }
     })
+    await remember($, removed)
     // The prompt is re-sent on every request; count it once per session.
     if (removedChars > 0 && !promptCounted) {
       promptCounted = true
@@ -313,9 +335,9 @@ export const register: Register = on => {
     if (typeof got.text !== 'string') return got
     await loadPolicy($)
     const isListing = e.type.includes('deferred_tools') || /^mcp__/m.test(got.text)
-    const m = isListing ? muteListing(got.text, isMuted) : muteInstructions(got.text, isMuted)
+    const m = isListing ? muteListing(got.text, isMuted) : muteInstructions(got.text, isMuted, isServer)
     if (!m) return got
-    if ('removed' in m) for (const b of m.removed) hidden.set(b.server, b.body)
+    if ('removed' in m) await remember($, m.removed)
     await record($, 'tools', got.text.length - m.text.length)
     return { ...got, text: m.text }
   }).catch(($, e, next) => next(e))
@@ -323,6 +345,7 @@ export const register: Register = on => {
   // When Claude reaches for a hidden server, hand its instructions back.
   on('tool.call', { tool: 'ToolSearch' }, async ($, e, next) => {
     const ran = await next(e)
+    await loadPolicy($)
     if (ran.deny !== undefined || hidden.size === 0) return ran
     const back = restore(`${ran.text ?? ''}\n${JSON.stringify(e)}`)
     return back.length ? { ...ran, context: [...(ran.context ?? []), ...back] } : ran
@@ -333,6 +356,7 @@ export const register: Register = on => {
     if (!server) return next(e)
     const ran = await next(e)
     await markUsed($, server)
+    await loadPolicy($)
     if (ran.deny !== undefined) return ran
     const back = restore(`mcp__${server}__`)
     return back.length ? { ...ran, context: [...(ran.context ?? []), ...back] } : ran

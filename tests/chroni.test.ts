@@ -166,6 +166,10 @@ The following MCP servers have provided instructions:
 
 ## blender
 Very long Blender instructions. ${'Respect the scene graph. '.repeat(200)}
+# Bundled Manuals
+Blender manual text that must be hidden too.
+## Executing Code
+More Blender text.
 
 ## ccd_session
 App session tools.
@@ -195,6 +199,8 @@ test('hides unused tool servers, keeps first-party ones, and adds lean replies',
   const { sections } = await $.prompt.compose(COMPOSE)
   const mcp = sections.find(s => s.id === 'mcp_instructions')!.text
   expect(mcp).not.toContain('Respect the scene graph')
+  expect(mcp).not.toContain('Blender manual text')
+  expect(mcp).not.toContain('More Blender text')
   expect(mcp).not.toContain('Generate sprites')
   expect(mcp).toContain('## ccd_session')
   expect(mcp).toContain('Chroni hid the instructions')
@@ -225,4 +231,28 @@ test('a hidden server gets its instructions back when Claude searches for it', a
   await $.prompt.compose(COMPOSE)
   const ran = await $.tool.call({ tool: 'ToolSearch', query: 'select:mcp__blender__run', max_results: 1 } as never)
   expect((ran.context ?? []).join('\n')).toContain('Respect the scene graph')
+})
+
+test('hidden instructions survive a reload (they are saved, not just kept in memory)', async ($, on) => {
+  const store = new Map<string, unknown>([['mcpUsed', {}]])
+  on('store.get', ($, e) => ({ value: store.get((e as { key: string }).key) }))
+  on('store.set', ($, e) => {
+    const { key, value } = e as { key: string; value: unknown }
+    store.set(key, value)
+    return { value: undefined }
+  })
+  on('ui.status', () => ({ value: undefined }))
+  on('prompt.compose', () => ({ sections: [{ id: 'mcp_instructions', text: INSTRUCTIONS, scope: 'session' as const }] }))
+  await $.prompt.compose(COMPOSE)
+  const saved = store.get('mcpHidden') as Record<string, string>
+  expect(Object.keys(saved)).toContain('blender')
+  expect(saved.blender).toContain('Blender manual text')
+})
+
+test('the map of a big file skips the lines Claude already got', async ($, on) => {
+  readWorld(on, bigFile)
+  const ran = await $.tool.call({ tool: 'Read', file_path: '/repo/src/server.ts' })
+  const guide = (ran.context ?? []).join('\n')
+  expect(guide).not.toContain('  1: export function handler0')
+  expect(guide).toContain('251: export function handler250')
 })

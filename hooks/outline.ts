@@ -33,13 +33,14 @@ const PATTERNS: [RegExp, RegExp][] = [
 // Files where a map is no help (data, lock files, minified bundles).
 const SKIP = /(\.lock|lock\.json|\.min\.(js|css)|\.map|\.svg|\.csv|\.tsv|\.log)$/i
 
-export function outline(path: string, text: string, max = 150): string | undefined {
+/** `from`: skip the first lines (Claude already has them). */
+export function outline(path: string, text: string, max = 150, from = 0): string | undefined {
   if (SKIP.test(path)) return undefined
   const rule = PATTERNS.find(([file]) => file.test(path))?.[1]
   const lines = text.split('\n')
   const hits: string[] = []
   const width = String(lines.length).length
-  for (let i = 0; i < lines.length; i++) {
+  for (let i = from; i < lines.length; i++) {
     const line = lines[i]!
     if (line.length > 300) continue
     const isHit = rule ? rule.test(line) : /^[^\s#/*})\]-][^]*$/.test(line) && line.trim().length > 3
