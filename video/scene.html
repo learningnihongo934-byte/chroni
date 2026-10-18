@@ -1,0 +1,569 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Chroni in 45 seconds</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,500;12..96,700;12..96,800&family=JetBrains+Mono:wght@400;600&display=block" rel="stylesheet">
+<style>
+:root{
+  --ink:#1B1530; --paper:#FFF8EC; --yellow:#FFD23F; --pink:#FF5D8F; --purple:#7B5CFF;
+  --mint:#3EE6A8; --sky:#5CC8FF; --orange:#FF8A3D; --term:#17122B; --termText:#D9D3F5;
+}
+*{box-sizing:border-box}
+html,body{margin:0;background:#000;overflow:hidden}
+#stage{position:relative;width:1920px;height:1080px;overflow:hidden;color:var(--ink);
+  font-family:"Bricolage Grotesque",system-ui,sans-serif;
+  background:var(--paper) radial-gradient(circle,#1B153014 2px,transparent 2.5px) 0 0/36px 36px;transform-origin:0 0}
+.mono{font-family:"JetBrains Mono",ui-monospace,monospace}
+.scene{position:absolute;inset:0;opacity:0}
+.abs{position:absolute}
+.card{background:#fff;border:4px solid var(--ink);border-radius:28px;box-shadow:8px 8px 0 var(--ink)}
+.pill{display:inline-block;border:4px solid var(--ink);border-radius:999px;padding:6px 22px;font-weight:700}
+h1,h2{margin:0;line-height:1.02;letter-spacing:-.02em}
+h2{font-size:78px;font-weight:800}
+
+/* brand bug */
+#bug{position:absolute;left:44px;top:34px;display:flex;align-items:center;gap:12px;font-weight:800;font-size:38px;opacity:0;z-index:5}
+#bug svg{width:62px;height:62px}
+
+/* captions */
+#cap{position:absolute;left:0;right:0;bottom:56px;display:flex;justify-content:center;z-index:10;pointer-events:none}
+#cap span{max-width:1560px;text-align:center;background:var(--ink);color:#fff;font-weight:700;font-size:48px;line-height:1.25;
+  padding:16px 34px 18px;border-radius:22px;box-shadow:6px 6px 0 var(--purple)}
+
+/* terminal */
+.terminal{position:absolute;background:var(--term);border:4px solid var(--ink);border-radius:24px;box-shadow:10px 10px 0 var(--ink);overflow:hidden}
+.terminal .bar{height:58px;background:#2A2245;border-bottom:4px solid var(--ink);display:flex;align-items:center;gap:12px;padding:0 22px;color:var(--termText);font-size:22px}
+.terminal .bar i{width:18px;height:18px;border-radius:50%;border:3px solid var(--ink);display:inline-block}
+.screen{position:absolute;left:0;right:0;top:62px;bottom:0;padding:16px 24px;font-family:"JetBrains Mono",monospace;color:var(--termText);overflow:hidden}
+.ln{white-space:pre;height:1.45em;line-height:1.45em}
+.err{background:var(--pink);color:#fff;border-radius:6px;margin:0 -8px;padding:0 8px}
+.dim{color:var(--mint);font-style:italic}
+.flash{position:absolute;inset:0;background:#fff;opacity:0;pointer-events:none}
+
+/* misc */
+.chip{position:absolute;font-family:"JetBrains Mono",monospace;font-size:24px;background:var(--term);color:var(--termText);padding:8px 14px;border-radius:12px;border:3px solid var(--ink);white-space:nowrap}
+.seg{position:absolute;top:0;height:100%;border-right:4px solid var(--ink);overflow:hidden}
+.lab{position:absolute;font-weight:700;font-size:30px;white-space:nowrap;text-align:center}
+.big{font-weight:800;font-size:120px;line-height:1}
+.badge{position:absolute;background:var(--mint);border:4px solid var(--ink);border-radius:999px;font-weight:800;font-size:46px;padding:6px 26px;box-shadow:5px 5px 0 var(--ink)}
+.server{position:absolute;width:400px;height:170px;padding:24px 28px}
+.server b{display:block;font-size:40px}
+.server small{font-size:26px;opacity:.7}
+.stamp{position:absolute;right:-14px;top:-30px;border:5px solid var(--pink);color:var(--pink);font-weight:800;font-size:30px;padding:2px 14px;border-radius:12px;background:#fff;letter-spacing:.06em}
+.mapline{white-space:pre;font-size:25px;line-height:1.75;padding:0 10px;border-radius:8px}
+.strike{position:relative}
+.strike::after{content:"";position:absolute;left:0;top:52%;height:5px;background:var(--pink);width:var(--w,0%);border-radius:3px}
+</style>
+</head>
+<body>
+<div id="stage">
+  <div id="bug"></div>
+
+  <!-- 1. intro -->
+  <section class="scene" id="s1">
+    <div class="abs" id="s1blob" style="left:150px;top:150px;width:700px;height:700px;border-radius:42% 58% 63% 37%/45% 41% 59% 55%;background:var(--pink);border:4px solid var(--ink)"></div>
+    <div class="abs" id="s1m" style="left:120px;top:110px;width:760px;height:760px"></div>
+    <div class="chip" id="s1c1" style="left:90px;top:150px">npm WARN deprecated ×412</div>
+    <div class="chip" id="s1c2" style="left:60px;top:760px">Compiling 381 of 900…</div>
+    <div class="chip" id="s1c3" style="left:640px;top:90px">⠋⠙⠹⠸ downloading</div>
+    <div class="abs" style="left:980px;top:230px;width:900px">
+      <div class="pill" id="s1pill" style="background:var(--mint);font-size:34px;transform:rotate(-2deg)">A free plugin for Claude Code</div>
+      <h1 id="s1h" style="font-size:230px;font-weight:800;margin:20px 0 6px">Chroni</h1>
+      <div id="s1sub" style="font-size:92px;font-weight:800">Use Claude <span id="s1sq" style="display:inline-block;background:var(--yellow);border:4px solid var(--ink);border-radius:22px;padding:0 18px">longer.</span></div>
+    </div>
+  </section>
+
+  <!-- 2. where tokens go -->
+  <section class="scene" id="s2">
+    <h2 class="abs" style="left:0;right:0;top:150px;text-align:center">Where your Claude usage really goes</h2>
+    <div class="abs" id="s2bar" style="left:180px;top:420px;width:1560px;height:170px;border:5px solid var(--ink);border-radius:24px;background:#fff;box-shadow:8px 8px 0 var(--ink);overflow:hidden"></div>
+    <div id="s2labs"></div>
+    <div class="abs" id="s2br1" style="top:350px;height:40px;border:5px solid var(--ink);border-bottom:none;border-radius:16px 16px 0 0"></div>
+    <div class="lab" id="s2bt1" style="top:280px;font-size:40px;font-weight:800">Chroni cuts the reading…</div>
+    <div class="lab" id="s2bt2" style="top:280px;font-size:40px;font-weight:800;color:var(--purple)">…not the thinking</div>
+  </section>
+
+  <!-- 3. build log -->
+  <section class="scene" id="s3">
+    <div class="terminal" id="s3t" style="left:110px;top:130px;width:1130px;height:740px">
+      <div class="bar"><i style="background:var(--pink)"></i><i style="background:var(--yellow)"></i><i style="background:var(--mint)"></i><span class="mono" style="margin-left:10px">claude › npm run build</span></div>
+      <div class="screen" id="s3s" style="font-size:19px"></div>
+      <div class="flash" id="s3f"></div>
+    </div>
+    <div class="abs" id="s3beam" style="left:1180px;top:520px;width:430px;height:34px;background:var(--yellow);border:4px solid var(--ink);border-radius:20px;transform-origin:right center;opacity:0"></div>
+    <div class="card abs" style="left:1320px;top:150px;width:500px;padding:30px 36px" id="s3card">
+      <div style="font-size:32px;font-weight:700">Claude reads</div>
+      <div class="big" id="s3tok">0</div>
+      <div style="font-size:32px;font-weight:700">tokens</div>
+      <div class="mono" style="font-size:26px;margin-top:14px" id="s3lines">0 lines</div>
+    </div>
+    <div class="badge" id="s3badge" style="left:1500px;top:420px">−98%</div>
+    <div class="abs" id="s3m" style="left:1520px;top:520px;width:380px;height:380px"></div>
+  </section>
+
+  <!-- 4. big file -->
+  <section class="scene" id="s4">
+    <div class="card abs" id="s4file" style="left:110px;top:130px;width:520px;height:700px;padding:26px 30px;overflow:hidden">
+      <div class="mono" style="font-size:28px;font-weight:600">player.js</div>
+      <div style="font-size:26px;opacity:.7;margin-bottom:14px">880 lines</div>
+      <svg id="s4mini" width="460" height="560"></svg>
+    </div>
+    <div class="abs" id="s4arrow" style="left:660px;top:440px;font-size:110px;font-weight:800">→</div>
+    <div class="card abs" id="s4out" style="left:820px;top:130px;width:990px;height:700px;padding:28px 34px;overflow:hidden">
+      <div style="font-size:34px;font-weight:800">What Claude gets</div>
+      <div class="mono" id="s4top" style="margin:16px 0 18px;background:#F1EDFF;border:3px solid var(--ink);border-radius:14px;padding:14px 18px;font-size:26px">lines 1–250, as usual</div>
+      <div style="font-size:30px;font-weight:700;margin-bottom:6px">+ a map of the rest</div>
+      <div class="mono" id="s4map"></div>
+    </div>
+    <div class="badge" id="s4badge" style="left:1400px;top:700px;background:var(--yellow)">13.5k → 5.3k tokens</div>
+  </section>
+
+  <!-- 5. tool servers -->
+  <section class="scene" id="s5">
+    <h2 class="abs" style="left:0;right:0;top:140px;text-align:center">Your tool servers</h2>
+    <div id="s5grid"></div>
+    <div class="badge" id="s5badge" style="left:50%;top:760px;transform:translateX(-50%);white-space:nowrap">thousands of tokens saved on every message</div>
+  </section>
+
+  <!-- 6. lean replies + handoff -->
+  <section class="scene" id="s6">
+    <div class="card abs" id="s6a" style="left:110px;top:170px;width:820px;height:600px;padding:36px 40px">
+      <div style="font-size:44px;font-weight:800;margin-bottom:26px">Lean replies</div>
+      <div id="s6chat" style="font-size:36px;line-height:1.35;background:#F1EDFF;border:3px solid var(--ink);border-radius:22px;padding:22px 28px"></div>
+    </div>
+    <div class="card abs" id="s6b" style="left:990px;top:170px;width:820px;height:600px;padding:36px 40px">
+      <div style="font-size:44px;font-weight:800;margin-bottom:26px">Long chats</div>
+      <div style="font-size:30px;font-weight:700">Chat size</div>
+      <div style="position:relative;height:90px;border:4px solid var(--ink);border-radius:18px;margin:10px 0 8px;overflow:hidden;background:#fff">
+        <div id="s6fill" style="position:absolute;left:0;top:0;bottom:0;width:10%;background:var(--orange);border-right:4px solid var(--ink)"></div>
+        <div style="position:absolute;left:80%;top:0;bottom:0;border-left:4px dashed var(--ink)"></div>
+      </div>
+      <div class="mono" id="s6num" style="font-size:44px;font-weight:600">10k tokens</div>
+      <div class="mono" id="s6toast" style="margin-top:24px;background:var(--term);color:var(--termText);border:4px solid var(--ink);border-radius:18px;padding:18px 22px;font-size:26px;line-height:1.5"></div>
+    </div>
+  </section>
+
+  <!-- 7. /chroni -->
+  <section class="scene" id="s7">
+    <h2 class="abs" style="left:0;right:0;top:120px;text-align:center">Cuts the reading, <span style="color:var(--purple)">not the thinking.</span></h2>
+    <div class="terminal" id="s7t" style="left:210px;top:290px;width:1500px;height:480px">
+      <div class="bar"><i style="background:var(--pink)"></i><i style="background:var(--yellow)"></i><i style="background:var(--mint)"></i><span class="mono" style="margin-left:10px">claude</span></div>
+      <div class="screen" id="s7s" style="font-size:30px;padding:24px 36px"></div>
+    </div>
+  </section>
+
+  <!-- 8. outro -->
+  <section class="scene" id="s8">
+    <div class="abs" style="left:110px;top:150px;width:640px;height:640px;border-radius:58% 42% 38% 62%/58% 55% 45% 42%;background:var(--yellow);border:4px solid var(--ink)"></div>
+    <div class="abs" id="s8m" style="left:90px;top:110px;width:680px;height:680px"></div>
+    <div class="abs" style="left:880px;top:170px;width:960px">
+      <h1 id="s8h" style="font-size:170px;font-weight:800">Chroni</h1>
+      <div id="s8sub" style="font-size:58px;font-weight:800;margin:6px 0 30px">Free. Open source.</div>
+      <div id="s8code" class="mono" style="background:var(--term);color:var(--mint);border:4px solid var(--ink);border-radius:20px;padding:22px 26px;font-size:27px;box-shadow:6px 6px 0 var(--ink)">/plugin install chroni \<br>&nbsp;&nbsp;--marketplace learningnihongo934-byte/chroni</div>
+      <div id="s8url" class="pill" style="margin-top:34px;background:var(--pink);color:#fff;font-size:60px;font-weight:800;padding:8px 36px;box-shadow:6px 6px 0 var(--ink)">chroni.web.app</div>
+    </div>
+  </section>
+
+  <div id="cap"><span></span></div>
+</div>
+
+<script>
+const DURATION = 45
+const $ = id => document.getElementById(id)
+const C = (x, a = 0, b = 1) => Math.min(b, Math.max(a, x))
+const P = (t, a, b) => C((t - a) / (b - a))
+const lerp = (a, b, x) => a + (b - a) * x
+const eo = x => 1 - Math.pow(1 - x, 3)
+const eio = x => x < .5 ? 4 * x * x * x : 1 - Math.pow(-2 * x + 2, 3) / 2
+const eb = x => { const c1 = 1.70158, c3 = c1 + 1; return 1 + c3 * Math.pow(x - 1, 3) + c1 * Math.pow(x - 1, 2) }
+const fmt = n => n >= 1000 ? (n / 1000).toFixed(1) + 'k' : String(Math.round(n))
+
+// The mascot from chroni.web.app.
+const mascot = () => `<svg viewBox="0 0 400 400" width="100%" height="100%" style="overflow:visible">
+  <ellipse cx="200" cy="360" rx="90" ry="12" fill="#1B1530" opacity=".18"/>
+  <g class="body" style="transform-origin:200px 330px">
+    <path d="M200 70 C300 70 330 160 330 230 C330 310 275 345 200 345 C125 345 70 310 70 230 C70 160 100 70 200 70Z" fill="#7B5CFF" stroke="#1B1530" stroke-width="8"/>
+    <path d="M150 105 C170 92 190 90 205 92" stroke="#fff" stroke-width="10" stroke-linecap="round" fill="none" opacity=".5"/>
+    <circle cx="160" cy="200" r="34" fill="#fff" stroke="#1B1530" stroke-width="6"/>
+    <circle cx="245" cy="200" r="34" fill="#fff" stroke="#1B1530" stroke-width="6"/>
+    <circle class="pupil" cx="160" cy="200" r="14" fill="#1B1530"/>
+    <circle class="pupil" cx="245" cy="200" r="14" fill="#1B1530"/>
+    <rect class="lid" x="124" y="164" width="72" height="72" rx="36" fill="#7B5CFF" style="transform-box:fill-box;transform-origin:center;transform:scaleY(0)"/>
+    <rect class="lid" x="209" y="164" width="72" height="72" rx="36" fill="#7B5CFF" style="transform-box:fill-box;transform-origin:center;transform:scaleY(0)"/>
+    <circle cx="125" cy="255" r="16" fill="#FF5D8F" opacity=".6"/>
+    <circle cx="282" cy="255" r="16" fill="#FF5D8F" opacity=".6"/>
+    <path d="M175 265 Q202 292 230 265" stroke="#1B1530" stroke-width="8" fill="none" stroke-linecap="round"/>
+    <g transform="translate(300 255) rotate(-18)">
+      <rect x="0" y="-16" width="70" height="32" rx="12" fill="#FFD23F" stroke="#1B1530" stroke-width="6"/>
+      <rect x="66" y="-10" width="22" height="20" rx="6" fill="#3EE6A8" stroke="#1B1530" stroke-width="6"/>
+      <rect x="10" y="12" width="20" height="34" rx="6" fill="#FF8A3D" stroke="#1B1530" stroke-width="6"/>
+    </g>
+    <path d="M200 70 C196 48 210 36 224 40" stroke="#1B1530" stroke-width="7" fill="none" stroke-linecap="round"/>
+    <circle cx="228" cy="38" r="12" fill="#FFD23F" stroke="#1B1530" stroke-width="6"/>
+  </g></svg>`
+
+// Bob, blink and look around, all as a function of time.
+function pose(el, t, { bob = 1, look = [0, 0], squash = 0 } = {}) {
+  const body = el.querySelector('.body')
+  const y = -12 * bob * (0.5 - 0.5 * Math.cos(t * 2 * Math.PI / 3))
+  const s = 1 + squash
+  body.style.transform = `translateY(${y}px) scale(${s},${1 / s})`
+  const blink = [1.7, 4.3, 6.1].some(b => Math.abs((t % 7) - b) < .08)
+  el.querySelectorAll('.lid').forEach(l => l.style.transform = `scaleY(${blink ? 1 : 0})`)
+  el.querySelectorAll('.pupil').forEach(p => p.style.transform = `translate(${look[0]}px,${look[1]}px)`)
+}
+
+for (const id of ['s1m', 's3m', 's8m']) $(id).innerHTML = mascot()
+$('bug').innerHTML = mascot() + '<span>Chroni</span>'
+
+// Scene 2: the context window, by what fills it.
+const SEGS = [
+  ['build logs', 'var(--orange)', .29],
+  ['whole files', 'var(--sky)', .23],
+  ['tool lists', 'var(--pink)', .17],
+  ['the chat, re-sent every message', 'var(--yellow)', .24],
+  ['thinking', 'var(--purple)', .07],
+]
+{
+  let x = 0
+  SEGS.forEach(([name, color, w], i) => {
+    const s = document.createElement('div')
+    s.className = 'seg'
+    s.style.left = x * 100 + '%'
+    s.style.background = color
+    s.dataset.w = w * 100
+    $('s2bar').appendChild(s)
+    const l = document.createElement('div')
+    l.className = 'lab'
+    l.id = 's2l' + i
+    l.textContent = name
+    const cx = 180 + 1560 * (x + w / 2)
+    l.style.left = cx + 'px'
+    l.style.top = (i % 2 ? 690 : 630) + 'px'
+    l.style.transform = 'translateX(-50%)'
+    if (i === 4) { l.style.color = 'var(--purple)'; l.style.fontWeight = 800 }
+    $('s2labs').appendChild(l)
+    x += w
+  })
+  const junk = 1 - SEGS[4][2]
+  Object.assign($('s2br1').style, { left: 190 + 'px', width: 1560 * junk - 20 + 'px' })
+  $('s2bt1').style.left = 180 + 1560 * junk / 2 + 'px'
+  $('s2bt2').style.left = 180 + 1560 * (junk + SEGS[4][2] / 2) - 60 + 'px'
+}
+
+// Scene 3: the same noisy build log as bench/demo.sh, and what Chroni's squeeze() makes of it.
+const LOG = ['> my-app@1.0.0 build', '> vite build && tsc --noEmit']
+for (let i = 1; i <= 380; i++) LOG.push(`transforming src/components/Widget${i}.tsx (${i * 3}ms)`)
+LOG.push("src/api/user.ts(42,7): error TS2322: Type 'string' is not assignable to type 'number'.")
+for (let i = 1; i <= 420; i++) LOG.push(`rendering chunk vendor-${i}.js  ${(i * 7)}.${i % 10} kB │ gzip: ${i * 2}.1 kB`)
+LOG.push("ERROR in src/pages/Home.tsx: Cannot find module 'lodash' or its corresponding type declarations.")
+for (let i = 1; i <= 90; i++) LOG.push(`  dist/assets/img-${i}.png  ${i * 13} kB`)
+LOG.push('Build failed with 2 errors.')
+const CUM = []; { let c = 0; for (const l of LOG) CUM.push(c += l.length + 1) }
+const TRIMMED = `> my-app@1.0.0 build
+> vite build && tsc --noEmit
+transforming src/components/Widget1.tsx (3ms)
+transforming src/components/Widget2.tsx (6ms)
+… (377 similar lines)
+transforming src/components/Widget380.tsx (1140ms)
+src/api/user.ts(42,7): error TS2322: Type 'string' is not assignable to type 'number'.
+rendering chunk vendor-1.js  7.1 kB │ gzip: 2.1 kB
+rendering chunk vendor-2.js  14.2 kB │ gzip: 4.1 kB
+… (417 similar lines)
+rendering chunk vendor-420.js  2940.0 kB │ gzip: 840.1 kB
+ERROR in src/pages/Home.tsx: Cannot find module 'lodash' or its corresponding type declarations.
+  dist/assets/img-1.png  13 kB
+  dist/assets/img-2.png  26 kB
+… (87 similar lines)
+  dist/assets/img-90.png  1170 kB
+Build failed with 2 errors.`.split('\n')
+const esc = s => s.replace(/&/g, '&amp;').replace(/</g, '&lt;')
+const klass = l => /error|ERROR/.test(l) ? 'ln err' : l.startsWith('…') ? 'ln dim' : 'ln'
+const trimmedHTML = TRIMMED.map(l => `<div class="${klass(l)}">${esc(l)}</div>`)
+
+// Scene 4: a file's minimap, and the map Chroni gives instead.
+{
+  let svg = '', y = 0
+  const colors = ['#7B5CFF', '#5CC8FF', '#FF8A3D', '#3EE6A8', '#1B153055']
+  let seed = 7
+  const rnd = () => (seed = (seed * 16807) % 2147483647) / 2147483647
+  while (y < 560) {
+    const indent = Math.floor(rnd() * 4) * 22
+    const w = 60 + rnd() * 300
+    svg += `<rect x="${indent}" y="${y}" width="${Math.min(w, 440 - indent)}" height="4" rx="2" fill="${colors[Math.floor(rnd() * 5)]}"/>`
+    y += rnd() < .12 ? 12 : 6.7
+  }
+  $('s4mini').innerHTML = svg + '<rect id="s4hi" x="-8" y="0" width="476" height="168" rx="8" fill="#FFD23F55" stroke="#1B1530" stroke-width="3" opacity="0"/>'
+}
+const MAP = [
+  ' 262: import { Queue } from "./queue.js"',
+  ' 312: export function initSearch(query) {',
+  ' 455: export class Player {',
+  ' 498:   play(track) {',
+  ' 561:   seek(seconds) {',
+  ' 640: function loadQueue(ids) {',
+  ' 733: export function renderControls(el) {',
+  ' 812: export default Player',
+]
+$('s4map').innerHTML = MAP.map((m, i) => `<div class="mapline" id="s4m${i}">${esc(m)}</div>`).join('')
+
+// Scene 5: tool servers. The stale ones get hidden.
+const SERVERS = [
+  ['Browser', 'built in', false], ['GitHub', 'used today', false], ['Blender', '41 days ago', true], ['Slack', 'used yesterday', false],
+  ['spritecook', '23 days ago', true], ['Computer use', 'built in', false], ['Roblox Studio', '19 days ago', true], ['Figma', '60 days ago', true],
+]
+$('s5grid').innerHTML = SERVERS.map(([n, when, stale], i) =>
+  `<div class="card server" id="s5c${i}" style="left:${150 + (i % 4) * 420}px;top:${310 + Math.floor(i / 4) * 210}px">
+    <b>${n}</b><small>${stale ? 'last used ' : ''}${when}</small>
+    ${stale ? `<div class="stamp" id="s5s${i}">HIDDEN</div>` : ''}</div>`).join('')
+
+// Scene 6
+const CHAT = [
+  ["Great question! I'll start by looking at the file.", true],
+  ['Fixed: the missing null check in parse(), line 42.', false],
+  ["To sum up, here's everything I just did…", true],
+]
+$('s6chat').insertAdjacentHTML('afterend', '<div id="s6same" style="margin-top:28px;font-size:40px;font-weight:800;color:var(--purple)">Same answer. Fewer tokens.</div>')
+$('s6chat').innerHTML = CHAT.map(([s, cut], i) => `<div id="s6c${i}" style="overflow:hidden"><span class="${cut ? 'strike' : ''}" style="${cut ? 'opacity:.75' : 'font-weight:700'}">${s}</span></div>`).join('')
+
+// Scene 7: real /chroni output.
+const STATS = [
+  ['<span style="color:#fff">› /chroni</span>', 0],
+  ['Chroni saved <b style="color:var(--yellow)">~68.3k tokens</b> all time.', 0],
+  ['', 0],
+  ['<span style="color:var(--orange)">●</span> output  noisy command output', 1.9],
+  ['<span style="color:var(--sky)">●</span> reads   big file reads', 20.0],
+  ['<span style="color:var(--pink)">●</span> tools   unused tool servers', 20.3],
+  ['<span style="color:var(--purple)">●</span> lean    shorter replies', -1],
+]
+$('s7s').innerHTML = STATS.map(([s, k], i) => `<div class="ln" id="s7l${i}" style="display:flex;align-items:center;gap:24px"><span style="width:640px">${s}</span>${
+  k > 0 ? `<span id="s7b${i}" style="height:26px;border-radius:8px;background:${['', '', '', 'var(--orange)', 'var(--sky)', 'var(--pink)'][i]};border:3px solid #000"></span><span style="color:#fff">~${k.toFixed(1)}k</span>`
+  : k < 0 ? '<span style="opacity:.6">(not counted)</span>' : ''}</div>`).join('')
+
+// Captions: the only words in the video.
+const CAPTIONS = [
+  [0.5, 4.8, 'Meet Chroni, a free plugin for Claude Code.'],
+  [5.2, 9.8, 'Most of your usage isn’t thinking. It’s Claude reading junk.'],
+  [10.2, 13.7, 'Claude runs a build. 896 lines of noise pour into its context.'],
+  [13.9, 18.3, 'Chroni keeps the start, the end and every error. 98% fewer tokens.'],
+  [18.7, 24.8, 'Big file? Claude gets a map and reads only what it needs.'],
+  [25.2, 27.9, 'Tool servers unused for 14 days stop loading every message.'],
+  [28.1, 30.3, 'Their tools still come back the moment Claude needs one.'],
+  [30.7, 35.8, 'Shorter replies, and /handoff when a chat gets long.'],
+  [36.2, 40.8, 'Type /chroni to see what it saved you.'],
+  [41.2, 45.0, 'Free and open source. Get it at chroni.web.app'],
+]
+
+const SCENES = [
+  ['s1', 0, 5, s1], ['s2', 5, 10, s2], ['s3', 10, 18.5, s3], ['s4', 18.5, 25, s4],
+  ['s5', 25, 30.5, s5], ['s6', 30.5, 36, s6], ['s7', 36, 41, s7], ['s8', 41, 45, s8],
+]
+
+function s1(t) {
+  $('s1blob').style.transform = `scale(${eb(P(t, 0, .7))}) rotate(${t * 4}deg)`
+  $('s1m').style.transform = `scale(${eb(P(t, .15, .85))})`
+  pose($('s1m'), t, { look: [Math.sin(t * 1.3) * 8, 0], squash: t < 1 ? .1 * Math.sin(P(t, .6, 1) * Math.PI) : 0 })
+  ;['s1c1', 's1c2', 's1c3'].forEach((id, i) => {
+    const a = P(t, .9 + i * .25, 1.3 + i * .25)
+    $(id).style.opacity = a
+    $(id).style.transform = `translateY(${Math.sin(t * 1.6 + i * 2) * 10 + (1 - eo(a)) * 30}px) rotate(${[-4, 3, -2][i]}deg)`
+  })
+  const pill = P(t, 1.9, 2.3), h = P(t, .6, 1.1), sub = P(t, 1.2, 1.7)
+  $('s1pill').style.opacity = pill
+  $('s1pill').style.transform = `rotate(-2deg) scale(${eb(pill)})`
+  $('s1h').style.opacity = h
+  $('s1h').style.transform = `translateX(${(1 - eo(h)) * 200}px)`
+  $('s1sub').style.opacity = sub
+  $('s1sub').style.transform = `translateY(${(1 - eo(sub)) * 40}px)`
+  const sq = Math.sin(Math.max(0, t - 1.7) * Math.PI / 1.3)
+  $('s1sq').style.transform = `rotate(${-2 + 3 * sq}deg) scale(${1 - .06 * sq},${1 + .06 * sq})`
+}
+
+function s2(t) {
+  const segs = $('s2bar').children
+  SEGS.forEach((s, i) => {
+    const a = eo(P(t, .5 + i * .5, 1.0 + i * .5))
+    segs[i].style.width = segs[i].dataset.w * a + '%'
+    $('s2l' + i).style.opacity = P(t, .8 + i * .5, 1.1 + i * .5)
+  })
+  const b = P(t, 3.3, 3.7), b2 = P(t, 3.8, 4.2)
+  $('s2br1').style.opacity = b
+  $('s2bt1').style.opacity = b
+  $('s2bt1').style.transform = `translate(-50%, ${(1 - eo(b)) * 20}px)`
+  $('s2bt2').style.opacity = b2
+  $('s2bt2').style.transform = `translate(-50%, ${(1 - eo(b2)) * 20}px)`
+}
+
+let s3state = ''
+function s3(t) {
+  const zap = 3.9
+  const scroll = eio(P(t, .3, 3.5))
+  const n = Math.round(scroll * LOG.length)
+  let html, key
+  if (t < zap + .15) {
+    key = 'log' + n
+    html = LOG.slice(Math.max(0, n - 27), n).map(l => `<div class="ln">${esc(l)}</div>`).join('')
+  } else {
+    const k = Math.min(TRIMMED.length, Math.floor((t - zap - .15) / .06) + 1)
+    key = 'trim' + k
+    html = trimmedHTML.slice(0, k).join('')
+  }
+  if (key !== s3state) { $('s3s').innerHTML = html; s3state = key }
+
+  const before = CUM[Math.max(0, n - 1)] / 4
+  const after = TRIMMED.join('\n').length / 4
+  const shrink = eo(P(t, zap + .1, zap + 1.3))
+  const tok = n === 0 ? 0 : lerp(before, after, shrink)
+  $('s3tok').textContent = fmt(tok)
+  $('s3tok').style.color = t > zap ? 'var(--purple)' : 'var(--ink)'
+  $('s3lines').textContent = (t < zap + .15 ? n : TRIMMED.length) + ' lines'
+
+  const m = P(t, 2.8, 3.4)
+  $('s3m').style.transform = `translateY(${(1 - eb(m)) * 700}px)`
+  pose($('s3m'), t, { look: [-10, 2], squash: t > zap && t < zap + .4 ? -.12 * Math.sin(P(t, zap, zap + .4) * Math.PI) : 0 })
+  const beam = P(t, zap - .05, zap + .1) * (1 - P(t, zap + .3, zap + .55))
+  $('s3beam').style.opacity = beam
+  $('s3beam').style.transform = `scaleX(${eo(P(t, zap - .05, zap + .1))})`
+  $('s3f').style.opacity = .85 * P(t, zap, zap + .08) * (1 - P(t, zap + .1, zap + .5))
+  $('s3t').style.transform = t > zap && t < zap + .4 ? `translate(${Math.sin(t * 90) * 6}px,${Math.cos(t * 70) * 4}px)` : ''
+  const bd = P(t, zap + 1.3, zap + 1.7)
+  $('s3badge').style.opacity = bd
+  $('s3badge').style.transform = `scale(${eb(bd)}) rotate(-4deg)`
+}
+
+function s4(t) {
+  $('s4file').style.transform = `translateX(${(1 - eo(P(t, 0, .5))) * -80}px)`
+  const a = P(t, .9, 1.3)
+  $('s4arrow').style.opacity = a
+  $('s4arrow').style.transform = `translateX(${(1 - eo(a)) * -40 + Math.sin(t * 5) * 6}px)`
+  const o = P(t, 1.1, 1.6)
+  $('s4out').style.opacity = o
+  $('s4out').style.transform = `translateX(${(1 - eo(o)) * 80}px)`
+  $('s4top').style.opacity = P(t, 1.5, 1.8)
+  MAP.forEach((_, i) => {
+    const e = $('s4m' + i), v = P(t, 2.0 + i * .14, 2.3 + i * .14)
+    e.style.opacity = v
+    e.style.transform = `translateX(${(1 - eo(v)) * 30}px)`
+    e.style.background = i === 2 && t > 4.0 ? '#FFD23F' : 'transparent'
+  })
+  // The part of the file Claude then reads: around Player (lines 455–520).
+  const hi = P(t, 4.0, 4.3)
+  const r = $('s4hi')
+  r.setAttribute('opacity', hi)
+  r.setAttribute('y', 560 * 455 / 880 - 6)
+  r.setAttribute('height', 560 * 65 / 880 + 12)
+  const bd = P(t, 4.5, 4.9)
+  $('s4badge').style.opacity = bd
+  $('s4badge').style.transform = `scale(${eb(bd)}) rotate(3deg)`
+}
+
+function s5(t) {
+  SERVERS.forEach(([, , stale], i) => {
+    const c = $('s5c' + i), v = P(t, .1 + i * .07, .45 + i * .07)
+    c.style.opacity = v
+    let tr = `translateY(${(1 - eo(v)) * 40}px)`
+    if (!stale) { c.style.transform = tr; return }
+    const back = i === 2 && t > 3.3
+    const s = P(t, 1.3 + i * .12, 1.55 + i * .12) * (back ? 1 - P(t, 3.3, 3.6) : 1)
+    $('s5s' + i).style.opacity = s
+    $('s5s' + i).style.transform = `rotate(-8deg) scale(${lerp(2, 1, eo(s))})`
+    c.style.background = back ? (t < 4.3 ? 'var(--mint)' : '#fff') : `rgb(${lerp(255, 226, s)},${lerp(255, 222, s)},${lerp(255, 235, s)})`
+    c.style.color = s > .5 && !back ? '#1B153099' : 'var(--ink)'
+    if (back) tr += ` scale(${1 + .08 * Math.sin(P(t, 3.3, 3.8) * Math.PI)})`
+    c.style.transform = tr
+  })
+  const b = P(t, 2.4, 2.8)
+  $('s5badge').style.opacity = b
+  $('s5badge').style.transform = `translateX(-50%) scale(${eb(b)})`
+}
+
+function s6(t) {
+  const a = P(t, 0, .4), b = P(t, .2, .6)
+  $('s6a').style.transform = `translateY(${(1 - eo(a)) * 60}px)`
+  $('s6b').style.transform = `translateY(${(1 - eo(b)) * 60}px)`
+  CHAT.forEach(([, cut], i) => {
+    const row = $('s6c' + i)
+    if (!cut) return
+    const k = P(t, .9 + i * .25, 1.5 + i * .25)
+    row.firstChild.style.setProperty('--w', eo(k) * 100 + '%')
+    const c = eio(P(t, 2.0, 2.6))
+    row.style.height = lerp(row.scrollHeight, 0, c) + 'px'
+    row.style.opacity = 1 - c
+  })
+  const same = P(t, 2.6, 3.0)
+  $('s6same').style.opacity = same
+  $('s6same').style.transform = `translateY(${(1 - eo(same)) * 20}px)`
+  const rise = eio(P(t, .5, 2.4)), drop = eio(P(t, 3.7, 4.4))
+  const size = lerp(lerp(10, 84, rise), 6, drop)
+  $('s6fill').style.width = size + '%'
+  $('s6fill').style.background = size > 80 ? 'var(--pink)' : size > 40 ? 'var(--orange)' : 'var(--mint)'
+  $('s6num').textContent = Math.round(size) + 'k tokens'
+  let toast = ''
+  if (t > 2.3) toast = 'Chroni: this chat is past 80k tokens.<br>Try <b style="color:var(--yellow)">/handoff</b>'
+  if (t > 3.0) toast += '<br><span style="color:#fff">› /handoff</span>'
+  if (t > 3.4) toast += '<br><span style="color:#fff">› /clear</span>'
+  if (t > 4.4) toast += '<br><span style="color:var(--mint)">continuing from .claude/handoff.md ✓</span>'
+  $('s6toast').innerHTML = toast
+  $('s6toast').style.opacity = t > 2.3 ? 1 : 0
+}
+
+function s7(t) {
+  $('s7t').style.transform = `translateY(${(1 - eo(P(t, 0, .5))) * 60}px)`
+  STATS.forEach(([, k], i) => {
+    $('s7l' + i).style.opacity = P(t, .4 + i * .22, .6 + i * .22)
+    if (k > 0) $('s7b' + i).style.width = eo(P(t, 1.8 + i * .15, 2.6 + i * .15)) * k / 20.3 * 380 + 'px'
+  })
+}
+
+function s8(t) {
+  $('s8m').style.transform = `scale(${eb(P(t, 0, .6))})`
+  pose($('s8m'), t, { look: [8, -4] })
+  ;[['s8h', .2], ['s8sub', .5], ['s8code', .8], ['s8url', 1.2]].forEach(([id, d]) => {
+    const v = P(t, d, d + .4)
+    $(id).style.opacity = v
+    $(id).style.transform = `translateY(${(1 - eo(v)) * 40}px)` + (id === 's8url' ? ` rotate(-2deg) scale(${1 + .03 * Math.sin(t * 4)})` : '')
+  })
+}
+
+function renderAt(t) {
+  for (const [id, a, b, fn] of SCENES) {
+    const el = $(id)
+    if (t < a || t >= b + (b === DURATION ? 1 : 0)) { el.style.opacity = 0; el.style.visibility = 'hidden'; continue }
+    el.style.visibility = 'visible'
+    const fin = a === 0 ? 1 : P(t, a, a + .35)
+    const fout = b === DURATION ? 1 : 1 - P(t, b - .3, b)
+    el.style.opacity = Math.min(fin, fout)
+    fn(t - a)
+  }
+  const bug = t > 5 && t < 41 ? Math.min(P(t, 5, 5.5), 1 - P(t, 40.6, 41)) : 0
+  $('bug').style.opacity = bug
+  if (bug) pose($('bug'), t, { bob: .3 })
+
+  const cap = CAPTIONS.find(([a, b]) => t >= a && t < b)
+  const span = $('cap').firstChild
+  if (cap) {
+    const [a, b, text] = cap
+    if (span.textContent !== text) span.textContent = text
+    const v = Math.min(P(t, a, a + .25), b === DURATION ? 1 : 1 - P(t, b - .2, b))
+    span.style.opacity = v
+    span.style.transform = `translateY(${(1 - eo(v)) * 20}px)`
+  } else span.style.opacity = 0
+}
+window.renderAt = renderAt
+window.DURATION = DURATION
+
+// Opened normally, it plays on a loop and fits the window; render.mjs drives it frame by frame instead.
+if (!location.search.includes('capture')) {
+  const fit = () => $('stage').style.transform = `scale(${Math.min(innerWidth / 1920, innerHeight / 1080)})`
+  addEventListener('resize', fit); fit()
+  const t0 = performance.now()
+  const seek = parseFloat(new URLSearchParams(location.search).get('t'))
+  const loop = () => { renderAt(isNaN(seek) ? ((performance.now() - t0) / 1000) % DURATION : seek); requestAnimationFrame(loop) }
+  document.fonts.ready.then(loop)
+}
+</script>
+</body>
+</html>

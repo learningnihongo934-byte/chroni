@@ -1,0 +1,7 @@
+{
+  "name": "chroni-video",
+  "private": true,
+  "type": "module",
+  "scripts": { "build": "./build.sh" },
+  "devDependencies": { "playwright-core": "^1.48.0" }
+}
