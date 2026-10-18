@@ -36,12 +36,29 @@ async function record($: EngineInterface, savedChars: number) {
   $.ui.status(`chroni: ~${fmt(sessionSaved)} tokens saved this session`)
 }
 
-const note = (linesBefore: number, linesAfter: number, path: string | undefined) =>
-  `[chroni: trimmed ${linesBefore.toLocaleString()} lines of output to ${linesAfter.toLocaleString()} ` +
-  `(kept the start, the end, and every error/warning-looking line). ` +
-  (path
-    ? `Full output: ${path} (Read or grep it if you need something that was cut.)]`
-    : `Re-run with CHRONI=off in front of the command for the full output.]`)
+// Claude Code cuts very long output itself before any hook sees it, leaving
+// a marker like "[19636 characters truncated]". Chroni can't recover that part.
+const PRE_CUT = /\[(\d[\d,]*) (characters|lines) truncated\]/
+
+const note = (linesBefore: number, linesAfter: number, path: string | undefined, raw: string) => {
+  const head =
+    `[chroni: trimmed ${linesBefore.toLocaleString()} lines of output to ${linesAfter.toLocaleString()} ` +
+    `(kept the start, the end, and every error/warning-looking line). `
+  const cut = PRE_CUT.exec(raw)
+  if (cut)
+    return (
+      head +
+      `Claude Code had already cut ${cut[1]} ${cut[2]} from the middle before Chroni saw it, so errors may be missing ` +
+      `and the saved log${path ? ` (${path})` : ''} is incomplete too. If you need the rest, re-run the command with ` +
+      `its output sent to a file (cmd > /tmp/out.log 2>&1) and grep that file.]`
+    )
+  return (
+    head +
+    (path
+      ? `Full output: ${path} (Read or grep it if you need something that was cut.)]`
+      : `Re-run with CHRONI=off in front of the command for the full output.]`)
+  )
+}
 
 export const register: Register = on => {
   on('session.start', async ($, e, next) => {
@@ -87,7 +104,7 @@ export const register: Register = on => {
       const [first, ...rest] = s.text.split('\n')
       return {
         result: {
-          stdout: `${first} (the command failed)\n${note(s.linesBefore, s.linesAfter, path)}\n${rest.join('\n')}`,
+          stdout: `${first} (the command failed)\n${note(s.linesBefore, s.linesAfter, path, raw)}\n${rest.join('\n')}`,
           stderr: '',
           interrupted: false,
         },
@@ -111,7 +128,7 @@ export const register: Register = on => {
     return {
       result: {
         ...r,
-        stdout: `${note(before, after, path)}\n${out ? out.text : r.stdout}`,
+        stdout: `${note(before, after, path, raw)}\n${out ? out.text : r.stdout}`,
         stderr: err ? err.text : r.stderr,
       },
       context: ran.context,

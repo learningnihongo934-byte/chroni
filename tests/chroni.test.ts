@@ -76,3 +76,13 @@ test('never trims commands that read content on purpose', async ($, on) => {
     expect((ran.result as { stdout: string }).stdout).toBe(noisy)
   }
 })
+
+test('says so when Claude Code already cut part of the output', async ($, on) => {
+  const text = `Exit code 1\n${noisy.slice(0, 5000)}\n... [19636 characters truncated] ...\n${noisy.slice(-5000)}`
+  world(on, { isError: true, text })
+  const ran = await $.tool.call({ tool: 'Bash', command: 'npm run build' })
+  const out = (ran.result as { stdout: string }).stdout
+  expect(out).toContain('Claude Code had already cut 19636 characters')
+  expect(out).toContain('cmd > /tmp/out.log 2>&1')
+  expect(out).not.toContain('Full output:')
+})

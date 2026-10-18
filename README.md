@@ -21,6 +21,8 @@ Repeated lines and progress bars ("Compiling 1 of 900…") collapse to a couple 
 - Images and background commands
 - Any command with `CHRONI=off` in front of it
 
+Very large outputs (over about 30KB) are handled by Claude Code itself: it saves them to a file and shows Claude a short preview, before any plugin sees them. For a failing command it cuts the middle out instead; when that happens Chroni's note tells Claude so, and how to get the missing part.
+
 ## How much it saves
 
 Measured on real commands, against what Claude Code would already show on its own (it cuts very large outputs itself):
