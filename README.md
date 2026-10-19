@@ -110,4 +110,4 @@ Full outputs are saved to `~/.claude/chroni/logs/`, rotating through 200 files s
 
 ## License
 
-MIT
+Free to use; copying, redistributing or selling it is not allowed without permission. See [LICENSE](LICENSE).
