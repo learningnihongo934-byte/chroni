@@ -111,3 +111,7 @@ Full outputs are saved to `~/.claude/chroni/logs/`, rotating through 200 files s
 ## License
 
 Free to use; copying, redistributing or selling it is not allowed without permission. See [LICENSE](LICENSE).
+
+---
+
+Made by **Virat Reddy Kaukuntla** ([@learningnihongo934-byte](https://github.com/learningnihongo934-byte))
